@@ -26,6 +26,7 @@ class _EditAppliancesState extends State<EditAppliances> {
   late TextEditingController priceController;
   late TextEditingController descriptionController;
   late TextEditingController timeController;
+  late TextEditingController stockController;
   bool isUpdating = false; // Prevent double submission
 
   @override
@@ -37,6 +38,8 @@ class _EditAppliancesState extends State<EditAppliances> {
     descriptionController =
         TextEditingController(text: widget.appliances.description);
     timeController = TextEditingController(text: widget.appliances.time);
+    stockController =
+        TextEditingController(text: widget.appliances.stock.toString());
   }
 
   @override
@@ -45,6 +48,7 @@ class _EditAppliancesState extends State<EditAppliances> {
     priceController.dispose();
     descriptionController.dispose();
     timeController.dispose();
+    stockController.dispose();
     super.dispose();
   }
 
@@ -136,6 +140,13 @@ class _EditAppliancesState extends State<EditAppliances> {
                 SizedBox(height: 16.h),
 
                 CustomTextField(
+                  controller: stockController,
+                  hintText: "Tồn kho",
+                  keyboardType: TextInputType.number,
+                  prefixIcon: Icon(Icons.inventory_2, color: kGray),
+                ),
+
+                CustomTextField(
                   controller: descriptionController,
                   hintText: "Mô tả sản phẩm",
                   maxLines: 5,
@@ -158,10 +169,34 @@ class _EditAppliancesState extends State<EditAppliances> {
                     if (titleController.text.isEmpty ||
                         priceController.text.isEmpty ||
                         timeController.text.isEmpty ||
-                        descriptionController.text.isEmpty) {
+                        descriptionController.text.isEmpty ||
+                        stockController.text.isEmpty) {
                       Get.snackbar(
                         "Thiếu thông tin",
                         "Vui lòng điền đầy đủ thông tin",
+                        backgroundColor: kRed,
+                        colorText: kLightWhite,
+                      );
+                      return;
+                    }
+
+                    final parsedPrice =
+                        double.tryParse(priceController.text.trim());
+                    final parsedStock =
+                        int.tryParse(stockController.text.trim());
+                    if (parsedPrice == null || parsedPrice < 0) {
+                      Get.snackbar(
+                        "Giá không hợp lệ",
+                        "Vui lòng nhập số không âm",
+                        backgroundColor: kRed,
+                        colorText: kLightWhite,
+                      );
+                      return;
+                    }
+                    if (parsedStock == null || parsedStock < 0) {
+                      Get.snackbar(
+                        "Tồn kho không hợp lệ",
+                        "Vui lòng nhập số nguyên không âm",
                         backgroundColor: kRed,
                         colorText: kLightWhite,
                       );
@@ -174,9 +209,10 @@ class _EditAppliancesState extends State<EditAppliances> {
 
                     Map<String, dynamic> updateData = {
                       'title': titleController.text,
-                      'price': double.tryParse(priceController.text) ?? 0.0,
+                      'price': parsedPrice,
                       'time': timeController.text,
                       'description': descriptionController.text,
+                      'stock': parsedStock,
                     };
 
                     String data = jsonEncode(updateData);

@@ -30,6 +30,7 @@ class AppliancessModel {
   final int v;
   final String category;
   final String time;
+  final int stock;
 
   AppliancessModel({
     required this.id,
@@ -48,6 +49,7 @@ class AppliancessModel {
     required this.v,
     required this.category,
     required this.time,
+    required this.stock,
   });
 
   factory AppliancessModel.fromJson(Map<String, dynamic> json) =>
@@ -81,6 +83,14 @@ class AppliancessModel {
         v: json["__v"] ?? 0,
         category: json["category"]?.toString() ?? "",
         time: json["time"]?.toString() ?? "",
+        stock: (() {
+          final value = json["stock"];
+          if (value == null) return 0;
+          if (value is int) return value;
+          if (value is double) return value.toInt();
+          if (value is String) return int.tryParse(value) ?? 0;
+          return 0;
+        })(),
       );
 
   Map<String, dynamic> toJson() => {
@@ -100,5 +110,6 @@ class AppliancessModel {
         "__v": v,
         "category": category,
         "time": time,
+        "stock": stock,
       };
 }

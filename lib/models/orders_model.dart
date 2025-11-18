@@ -22,6 +22,11 @@ class OrdersModel {
   final StoreId storeId;
   final List<double> storeCoords;
   final List<double> recipientCoords;
+  final String? driverId;
+  final String? returnStatus;
+  final String? returnReason;
+  final double? refundAmount;
+  final String? paymentStatus;
   final DateTime createdAt;
   final DateTime updatedAt;
 
@@ -39,6 +44,11 @@ class OrdersModel {
     required this.recipientCoords,
     required this.createdAt,
     required this.updatedAt,
+    this.driverId,
+    this.returnStatus,
+    this.returnReason,
+    this.refundAmount,
+    this.paymentStatus,
   });
 
   factory OrdersModel.fromJson(Map<String, dynamic> json) => OrdersModel(
@@ -56,6 +66,11 @@ class OrdersModel {
             List<double>.from(json["storeCoords"].map((x) => x?.toDouble())),
         recipientCoords: List<double>.from(
             json["recipientCoords"].map((x) => x?.toDouble())),
+        driverId: json["driverId"],
+        returnStatus: json["returnStatus"],
+        returnReason: json["returnReason"],
+        refundAmount: json["refundAmount"]?.toDouble(),
+        paymentStatus: json["paymentStatus"],
         createdAt: DateTime.parse(json["createdAt"]),
         updatedAt: DateTime.parse(json["updatedAt"]),
       );
@@ -72,6 +87,11 @@ class OrdersModel {
         "storeId": storeId.toJson(),
         "storeCoords": List<dynamic>.from(storeCoords.map((x) => x)),
         "recipientCoords": List<dynamic>.from(recipientCoords.map((x) => x)),
+        "driverId": driverId,
+        "returnStatus": returnStatus,
+        "returnReason": returnReason,
+        "refundAmount": refundAmount,
+        "paymentStatus": paymentStatus,
         "createdAt": createdAt.toIso8601String(),
         "updatedAt": updatedAt.toIso8601String(),
       };
@@ -139,12 +159,14 @@ class AppliancesId {
   final String title;
   final String time;
   final List<String> imageUrl;
+  final int? stock;
 
   AppliancesId({
     required this.id,
     required this.title,
     required this.time,
     required this.imageUrl,
+    this.stock,
   });
 
   factory AppliancesId.fromJson(Map<String, dynamic> json) => AppliancesId(
@@ -152,6 +174,14 @@ class AppliancesId {
         title: json["title"],
         time: json["time"],
         imageUrl: List<String>.from(json["imageUrl"].map((x) => x)),
+        stock: (() {
+          final v = json["stock"];
+          if (v == null) return null;
+          if (v is int) return v;
+          if (v is double) return v.toInt();
+          if (v is String) return int.tryParse(v);
+          return null;
+        })(),
       );
 
   Map<String, dynamic> toJson() => {
@@ -159,6 +189,7 @@ class AppliancesId {
         "title": title,
         "time": time,
         "imageUrl": List<dynamic>.from(imageUrl.map((x) => x)),
+        if (stock != null) "stock": stock,
       };
 }
 

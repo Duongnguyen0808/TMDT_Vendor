@@ -25,6 +25,7 @@ class _AddAppliancesState extends State<AddAppliancess> {
   final TextEditingController title = TextEditingController();
   final TextEditingController description = TextEditingController();
   final TextEditingController price = TextEditingController();
+  final TextEditingController stock = TextEditingController(text: '100');
   final TextEditingController preparation = TextEditingController();
   final TextEditingController types = TextEditingController();
   final TextEditingController additivePrice = TextEditingController();
@@ -114,6 +115,7 @@ class _AddAppliancesState extends State<AddAppliancess> {
                     price: price,
                     preparation: preparation,
                     types: types,
+                    stock: stock,
                   ),
                   AdditivesInfo(
                     additivePrice: additivePrice,
@@ -131,6 +133,7 @@ class _AddAppliancesState extends State<AddAppliancess> {
                       if (title.text.isEmpty) missingFields.add("Tiêu đề");
                       if (description.text.isEmpty) missingFields.add("Mô tả");
                       if (price.text.isEmpty) missingFields.add("Giá");
+                      if (stock.text.isEmpty) missingFields.add("Tồn kho");
                       if (preparation.text.isEmpty)
                         missingFields.add("Thời gian giao hàng");
                       if (controller.types.isEmpty)
@@ -179,6 +182,7 @@ class _AddAppliancesState extends State<AddAppliancess> {
                                   store: store.store!.id,
                                   description: description.text,
                                   price: double.parse(price.text),
+                                  stock: int.tryParse(stock.text) ?? 0,
                                   additives: controller.additivesList,
                                   imageUrl: images.images);
 

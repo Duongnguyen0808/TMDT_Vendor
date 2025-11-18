@@ -239,6 +239,26 @@ class _AppliancesTileState extends State<AppliancesTile> {
                                 ),
                               ],
                             ),
+                            Row(
+                              children: [
+                                Icon(Icons.inventory_2,
+                                    size: 12.sp,
+                                    color: widget.appliances.stock > 0
+                                        ? kGray
+                                        : kRed),
+                                SizedBox(width: 4.w),
+                                ReusableText(
+                                  text:
+                                      "Tồn: ${widget.appliances.stock.toString()}",
+                                  style: appStyle(
+                                      10,
+                                      widget.appliances.stock > 0
+                                          ? kGray
+                                          : kRed,
+                                      FontWeight.w500),
+                                ),
+                              ],
+                            ),
                             if (widget.appliances.additives.isNotEmpty)
                               SizedBox(
                                 height: 22.h,

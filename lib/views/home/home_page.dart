@@ -12,6 +12,8 @@ import 'package:appliances_flutter/views/home/widget/orders/new_orders.dart';
 import 'package:appliances_flutter/views/home/widget/orders/preparing.dart';
 import 'package:appliances_flutter/views/home/widget/orders/ready_orders.dart';
 import 'package:appliances_flutter/views/home/widget/orders/seld_deliveries.dart';
+import 'package:get/get.dart';
+import 'package:appliances_flutter/views/chat/chat_list_page.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -69,6 +71,15 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
           )
         ],
       )),
+      floatingActionButton: FloatingActionButton(
+        backgroundColor: kPrimary,
+        onPressed: () {
+          Get.to(() => const VendorChatListPage(),
+              transition: Transition.fadeIn,
+              duration: const Duration(milliseconds: 600));
+        },
+        child: const Icon(Icons.chat, color: Colors.white),
+      ),
     );
   }
 }

@@ -1,4 +1,5 @@
 import 'package:appliances_flutter/firebase_options.dart';
+import 'package:appliances_flutter/controllers/live_updates_controller.dart';
 import 'package:appliances_flutter/views/auth/login_page.dart';
 import 'package:appliances_flutter/views/auth/verification_page.dart';
 import 'package:appliances_flutter/views/auth/waiting_page.dart';
@@ -47,6 +48,13 @@ class MyApp extends StatelessWidget {
       defaultHome = const HomePage();
     } else if (storeId != null && verification != null) {
       defaultHome = const WaitingPage();
+    }
+
+    // Initialize socket live updates when logged in
+    if (accessToken != null) {
+      if (!Get.isRegistered<LiveUpdatesController>()) {
+        Get.put(LiveUpdatesController(), permanent: true);
+      }
     }
 
     return ScreenUtilInit(

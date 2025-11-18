@@ -21,6 +21,7 @@ class AddAppliancessModel {
   final String store;
   final String description;
   final double price;
+  final int stock;
   final List<Additive> additives;
   final List<String> imageUrl;
 
@@ -35,6 +36,7 @@ class AddAppliancessModel {
     required this.store,
     required this.description,
     required this.price,
+    required this.stock,
     required this.additives,
     required this.imageUrl,
   });
@@ -57,6 +59,9 @@ class AddAppliancessModel {
         price: (json["price"] is int)
             ? (json["price"] as int).toDouble()
             : (json["price"]?.toDouble() ?? 0.0),
+        stock: (json["stock"] is int)
+            ? (json["stock"] as int)
+            : int.tryParse(json["stock"].toString()) ?? 0,
         additives: json["additives"] != null
             ? List<Additive>.from(
                 json["additives"].map((x) => Additive.fromJson(x)))
@@ -77,6 +82,7 @@ class AddAppliancessModel {
         "store": store,
         "description": description,
         "price": price,
+        "stock": stock,
         "additives": List<dynamic>.from(additives.map((x) => x.toJson())),
         "imageUrl": List<dynamic>.from(imageUrl.map((x) => x)),
       };

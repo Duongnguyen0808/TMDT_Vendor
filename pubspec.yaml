@@ -35,6 +35,8 @@ dependencies:
   otp_text_field_v2: ^1.0.3
   vietmap_flutter_gl: ^4.0.1
   vietmap_flutter_plugin: ^0.5.1
+  socket_io_client: ^2.0.3
+  url_launcher: ^6.3.0
 
 dev_dependencies:
   flutter_test:

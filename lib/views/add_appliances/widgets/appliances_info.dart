@@ -18,7 +18,8 @@ class AppliancesInfo extends StatelessWidget {
       required this.description,
       required this.price,
       required this.preparation,
-      required this.types});
+      required this.types,
+      required this.stock});
 
   final Function back;
   final Function next;
@@ -27,6 +28,7 @@ class AppliancesInfo extends StatelessWidget {
   final TextEditingController price;
   final TextEditingController preparation;
   final TextEditingController types;
+  final TextEditingController stock;
 
   @override
   Widget build(BuildContext context) {
@@ -82,6 +84,14 @@ class AppliancesInfo extends StatelessWidget {
                       hintText: "Giá sản phẩm (VD: 500000)",
                       keyboardType: TextInputType.number,
                       prefixIcon: const Icon(Icons.attach_money)),
+                  SizedBox(
+                    height: 15.h,
+                  ),
+                  CustomTextField(
+                      controller: stock,
+                      hintText: "Số lượng tồn kho (VD: 100)",
+                      keyboardType: TextInputType.number,
+                      prefixIcon: const Icon(Icons.inventory)),
                   SizedBox(
                     height: 15.h,
                   ),
