@@ -17,22 +17,32 @@ class HomeTile extends StatelessWidget {
     return GestureDetector(
       onTap: onTap,
       child: Column(
+        mainAxisSize: MainAxisSize.min,
         children: [
           Container(
             width: 40.w,
-            height: 40.h,
+            height: 40.h - 1, // giảm nhẹ để tránh overflow do rounding
             decoration: BoxDecoration(
               color: kPrimary.withOpacity(0.1),
               borderRadius: BorderRadius.circular(8.r),
             ),
+            alignment: Alignment.center,
             child: Icon(
               icon,
               color: kPrimary,
-              size: 24.sp,
+              size: 22.sp, // giảm nhẹ kích thước icon
             ),
           ),
-          SizedBox(height: 4.h),
-          ReusableText(text: text, style: appStyle(11, kGray, FontWeight.w500))
+          SizedBox(height: 3.h),
+          Flexible(
+            child: FittedBox(
+              fit: BoxFit.scaleDown,
+              child: ReusableText(
+                text: text,
+                style: appStyle(11, kGray, FontWeight.w500),
+              ),
+            ),
+          ),
         ],
       ),
     );

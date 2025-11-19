@@ -17,6 +17,7 @@ import 'package:appliances_flutter/controllers/store_controller.dart';
 import 'package:appliances_flutter/controllers/uploader_controller.dart';
 import 'package:appliances_flutter/views/auth/widgets/email_textfield.dart';
 import 'package:appliances_flutter/views/auth/widgets/map_btn.dart';
+import 'package:appliances_flutter/views/auth/policy_page.dart';
 
 class StoreRegistration extends StatefulWidget {
   const StoreRegistration({super.key});
@@ -38,6 +39,7 @@ class _StoreRegistrationState extends State<StoreRegistration> {
   List<dynamic> _selectedPlaceList = [];
   final UploaderController uploader = Get.put(UploaderController());
   final StoreController controller = Get.put(StoreController());
+  bool _agreePolicy = false;
 
   void _safeSetState(VoidCallback fn) {
     if (!mounted) return;
@@ -508,10 +510,60 @@ class _StoreRegistrationState extends State<StoreRegistration> {
                       SizedBox(
                         height: 20.h,
                       ),
+                      // Chính sách và đồng ý
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.center,
+                        children: [
+                          Checkbox(
+                            value: _agreePolicy,
+                            onChanged: (v) {
+                              setState(() => _agreePolicy = v ?? false);
+                            },
+                            activeColor: kPrimary,
+                          ),
+                          Expanded(
+                            child: Wrap(
+                              crossAxisAlignment: WrapCrossAlignment.center,
+                              children: [
+                                Text('Tôi đồng ý với ',
+                                    style:
+                                        appStyle(12, kDark, FontWeight.w400)),
+                                TextButton(
+                                  style: TextButton.styleFrom(
+                                    padding: EdgeInsets.zero,
+                                    minimumSize: Size(0, 0),
+                                    tapTargetSize:
+                                        MaterialTapTargetSize.shrinkWrap,
+                                  ),
+                                  onPressed: () {
+                                    Get.to(() => const PolicyPage());
+                                  },
+                                  child: Text('chính sách',
+                                      style: appStyle(
+                                          12, kPrimary, FontWeight.w600)),
+                                ),
+                                Text(' của ứng dụng',
+                                    style:
+                                        appStyle(12, kDark, FontWeight.w400)),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                      SizedBox(height: 12.h),
                       CustomButton(
                         text: "THÊM CỮA HÀNG",
                         btnHieght: 35.h,
                         onTap: () {
+                          if (!_agreePolicy) {
+                            Get.snackbar(
+                              colorText: kLightWhite,
+                              backgroundColor: kPrimary,
+                              "Yêu cầu",
+                              "Vui lòng đồng ý với chính sách để tiếp tục",
+                            );
+                            return;
+                          }
                           if (_time.text.isEmpty ||
                               _title.text.isEmpty ||
                               _postalCode.text.isEmpty ||

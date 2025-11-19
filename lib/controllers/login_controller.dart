@@ -48,33 +48,54 @@ class LoginController extends GetxController {
       if (response.statusCode == 200) {
         var data = loginResponseFromJson(response.body);
 
+        // Lưu dữ liệu user
         box.write(data.id, json.encode(data));
         box.write('userId', data.id);
         box.write('accessToken', data.userToken);
         box.write('e-verification', data.verification);
 
-        if (data.verification == false) {
+        final isEmailVerified = data.verification;
+        final isVendor = data.userType.toLowerCase() == 'vendor';
+        final isClient = data.userType.toLowerCase() == 'client';
+
+        if (!isEmailVerified) {
+          // Chưa xác minh email
           Get.snackbar(
             'Xác minh',
             'Vui lòng xác thực email của bạn',
             backgroundColor: kPrimary,
             colorText: kLightWhite,
           );
-
           Get.offAll(
             () => const VerificationPage(),
             transition: kTransition,
             duration: kDuration,
           );
-        } else if (data.verification == true && data.userType == 'Client') {
+        } else if (isEmailVerified && isClient) {
+          // Email OK nhưng user là Client -> chuyển tới đăng ký cửa hàng
           defaultHome = const Login();
           Get.offAll(
             () => const StoreRegistration(),
             transition: kTransition,
             duration: kDuration,
           );
-        } else if (data.verification == true && data.userType == 'Vendor') {
+        } else if (isEmailVerified && isVendor) {
+          // Đã xác minh & là Vendor -> lấy thông tin cửa hàng
           getVendorInfo(data.userToken);
+        } else {
+          // Loại user không xác định -> quay về màn login
+          Get.snackbar(
+            'Loại tài khoản',
+            'Loại tài khoản không hỗ trợ: ${data.userType}',
+            backgroundColor: kPrimary,
+            colorText: kLightWhite,
+          );
+          defaultHome = const Login();
+          Get.offAll(
+            () => const Login(),
+            transition: kTransition,
+            duration: kDuration,
+          );
         }
         isLoading = false;
       } else {

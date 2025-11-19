@@ -12,6 +12,7 @@ class VendorOrderController extends GetxController {
   RxBool isLoading = false.obs;
   RxList<OrdersModel> pendingOrders = <OrdersModel>[].obs;
   RxList<OrdersModel> preparingOrders = <OrdersModel>[].obs;
+  RxList<OrdersModel> waitingShipperOrders = <OrdersModel>[].obs;
   RxList<OrdersModel> deliveringOrders = <OrdersModel>[].obs;
   RxList<OrdersModel> deliveredOrders = <OrdersModel>[].obs;
   RxList<OrdersModel> cancelledOrders = <OrdersModel>[].obs;
@@ -28,6 +29,7 @@ class VendorOrderController extends GetxController {
     await Future.wait([
       fetchOrdersByStatus('Pending'),
       fetchOrdersByStatus('Preparing'),
+      fetchOrdersByStatus('WaitingShipper'),
       fetchOrdersByStatus('Delivering'),
       fetchOrdersByStatus('Delivered'),
       fetchOrdersByStatus('Cancelled'),
@@ -38,7 +40,9 @@ class VendorOrderController extends GetxController {
     String accessToken = box.read('accessToken');
 
     try {
-      final url = Uri.parse('$appBaseUrl/api/orders/store/$storeId/$status');
+      // Dùng advanced endpoint để đảm bảo thấy cả đơn chưa Completed (payment=all)
+      final url = Uri.parse(
+          '$appBaseUrl/api/orders/store/$storeId?statuses=$status&payment=all&page=1&limit=100');
 
       final response = await http.get(
         url,
@@ -49,9 +53,13 @@ class VendorOrderController extends GetxController {
       );
 
       if (response.statusCode == 200) {
-        final List<dynamic> data = jsonDecode(response.body);
-        final List<OrdersModel> orders =
-            data.map((json) => OrdersModel.fromJson(json)).toList();
+        final Map<String, dynamic> wrapper = jsonDecode(response.body);
+        final List<dynamic> data =
+            (wrapper['data'] is List) ? wrapper['data'] : [];
+        final List<OrdersModel> orders = data
+            .map(
+                (json) => OrdersModel.fromJson(Map<String, dynamic>.from(json)))
+            .toList();
 
         switch (status) {
           case 'Pending':
@@ -59,6 +67,9 @@ class VendorOrderController extends GetxController {
             break;
           case 'Preparing':
             preparingOrders.value = orders;
+            break;
+          case 'WaitingShipper':
+            waitingShipperOrders.value = orders;
             break;
           case 'Delivering':
             deliveringOrders.value = orders;
@@ -70,6 +81,9 @@ class VendorOrderController extends GetxController {
             cancelledOrders.value = orders;
             break;
         }
+      } else {
+        print(
+            '[VendorOrderController][fetchOrdersByStatus] HTTP ${response.statusCode} body=${response.body}');
       }
     } catch (e) {
       print('Error fetching $status orders: $e');
@@ -81,15 +95,14 @@ class VendorOrderController extends GetxController {
     isLoading.value = true;
 
     try {
-      final url =
-          Uri.parse('$appBaseUrl/api/orders/$orderId?status=$newStatus');
-
+      final url = Uri.parse('$appBaseUrl/api/orders/$orderId');
       final response = await http.put(
         url,
         headers: {
           'Content-Type': 'application/json',
           'Authorization': 'Bearer $accessToken',
         },
+        body: jsonEncode({'orderStatus': newStatus}),
       );
 
       if (response.statusCode == 200) {
@@ -106,6 +119,8 @@ class VendorOrderController extends GetxController {
         // Go back
         Get.back();
       } else {
+        print(
+            '[VendorOrderController][updateOrderStatus] HTTP ${response.statusCode} body=${response.body}');
         Get.snackbar(
           'Lỗi',
           'Không thể cập nhật đơn hàng',
@@ -123,6 +138,35 @@ class VendorOrderController extends GetxController {
     } finally {
       isLoading.value = false;
     }
+  }
+
+  // Convenience: approve đơn Pending -> chuyển Preparing
+  Future<void> approvePending(String orderId) async {
+    await updateOrderStatus(orderId, 'Preparing');
+  }
+
+  String? nextStatus(String current) {
+    const flow = [
+      'Pending',
+      'Preparing',
+      'WaitingShipper',
+      'Delivering',
+      'Delivered'
+    ];
+    final idx = flow.indexOf(current);
+    if (idx == -1) return null;
+    if (idx < flow.length - 1) return flow[idx + 1];
+    return null; // delivered cuối
+  }
+
+  Future<void> progressOrder(String orderId, String currentStatus) async {
+    final ns = nextStatus(currentStatus);
+    if (ns == null) {
+      Get.snackbar('Trạng thái', 'Đơn đã ở trạng thái cuối cùng',
+          backgroundColor: kPrimary, colorText: kLightWhite);
+      return;
+    }
+    await updateOrderStatus(orderId, ns);
   }
 
   Future<OrdersModel?> fetchOrderDetail(String orderId) async {

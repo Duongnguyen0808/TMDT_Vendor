@@ -8,7 +8,6 @@ import 'package:appliances_flutter/constants/constants.dart';
 import 'package:appliances_flutter/controllers/vendor_order_controller.dart';
 import 'package:appliances_flutter/views/orders/widgets/vendor_order_tile.dart';
 import 'package:appliances_flutter/controllers/chat_controller.dart';
-import 'package:appliances_flutter/views/drivers/drivers_list_page.dart';
 
 class OrdersPage extends StatefulWidget {
   const OrdersPage({super.key});
@@ -26,7 +25,7 @@ class _OrdersPageState extends State<OrdersPage>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 5, vsync: this);
+    _tabController = TabController(length: 6, vsync: this);
     // load unread summary for order tiles badges
     WidgetsBinding.instance.addPostFrameCallback((_) {
       chatCtrl.loadUnreadSummary();
@@ -54,11 +53,6 @@ class _OrdersPageState extends State<OrdersPage>
             icon: Icon(Icons.refresh, color: kLightWhite),
             onPressed: () => controller.fetchAllOrders(),
           ),
-          IconButton(
-            icon: Icon(Icons.delivery_dining, color: kLightWhite),
-            tooltip: 'Quản lý tài xế',
-            onPressed: () => Get.to(() => const DriversListPage()),
-          ),
         ],
         bottom: TabBar(
           controller: _tabController,
@@ -71,19 +65,22 @@ class _OrdersPageState extends State<OrdersPage>
           tabs: [
             Tab(
                 child: _buildTabWithBadge(
-                    "Chờ xác nhận", controller.pendingOrders.length)),
+                    "Chờ xác nhận", controller.pendingOrders)),
             Tab(
                 child: _buildTabWithBadge(
-                    "Đang chuẩn bị", controller.preparingOrders.length)),
+                    "Đang chuẩn bị", controller.preparingOrders)),
             Tab(
                 child: _buildTabWithBadge(
-                    "Đang vận chuyển", controller.deliveringOrders.length)),
+                    "Tìm shipper", controller.waitingShipperOrders)),
             Tab(
                 child: _buildTabWithBadge(
-                    "Đã giao", controller.deliveredOrders.length)),
+                    "Đang vận chuyển", controller.deliveringOrders)),
             Tab(
-                child: _buildTabWithBadge(
-                    "Đã hủy", controller.cancelledOrders.length)),
+                child:
+                    _buildTabWithBadge("Đã giao", controller.deliveredOrders)),
+            Tab(
+                child:
+                    _buildTabWithBadge("Đã hủy", controller.cancelledOrders)),
           ],
         ),
       ),
@@ -93,6 +90,7 @@ class _OrdersPageState extends State<OrdersPage>
           children: [
             _buildOrdersList(controller.pendingOrders, "Chờ xác nhận"),
             _buildOrdersList(controller.preparingOrders, "Đang chuẩn bị"),
+            _buildOrdersList(controller.waitingShipperOrders, "Tìm shipper"),
             _buildOrdersList(controller.deliveringOrders, "Đang vận chuyển"),
             _buildOrdersList(controller.deliveredOrders, "Đã giao"),
             _buildOrdersList(controller.cancelledOrders, "Đã hủy"),
@@ -102,9 +100,9 @@ class _OrdersPageState extends State<OrdersPage>
     );
   }
 
-  Widget _buildTabWithBadge(String title, int count) {
+  Widget _buildTabWithBadge(String title, RxList<dynamic> list) {
     return Obx(() {
-      final displayCount = count;
+      final displayCount = list.length; // reactive dependency registered here
       return Row(
         mainAxisSize: MainAxisSize.min,
         children: [

@@ -4,8 +4,31 @@
 
 import 'dart:convert';
 
-List<OrdersModel> ordersModelFromJson(String str) => List<OrdersModel>.from(
-    json.decode(str).map((x) => OrdersModel.fromJson(x)));
+List<OrdersModel> ordersModelFromJson(String str) {
+  try {
+    final decoded = json.decode(str);
+    if (decoded is List) {
+      return decoded
+          .map<OrdersModel>((x) => OrdersModel.fromJson(_asMap(x)))
+          .toList();
+    }
+    if (decoded is Map && decoded['data'] is List) {
+      return (decoded['data'] as List)
+          .map<OrdersModel>((x) => OrdersModel.fromJson(_asMap(x)))
+          .toList();
+    }
+    // Không đúng dạng -> trả về rỗng để tránh null crash
+    return [];
+  } catch (e) {
+    return [];
+  }
+}
+
+Map<String, dynamic> _asMap(dynamic v) {
+  if (v is Map<String, dynamic>) return v;
+  if (v is Map) return Map<String, dynamic>.from(v);
+  return <String, dynamic>{};
+}
 
 String ordersModelToJson(List<OrdersModel> data) =>
     json.encode(List<dynamic>.from(data.map((x) => x.toJson())));
@@ -23,6 +46,7 @@ class OrdersModel {
   final List<double> storeCoords;
   final List<double> recipientCoords;
   final String? driverId;
+  final String? proposedDriverId;
   final String? returnStatus;
   final String? returnReason;
   final double? refundAmount;
@@ -45,6 +69,7 @@ class OrdersModel {
     required this.createdAt,
     required this.updatedAt,
     this.driverId,
+    this.proposedDriverId,
     this.returnStatus,
     this.returnReason,
     this.refundAmount,
@@ -52,27 +77,41 @@ class OrdersModel {
   });
 
   factory OrdersModel.fromJson(Map<String, dynamic> json) => OrdersModel(
-        id: json["_id"],
-        userId: UserId.fromJson(json["userId"]),
-        orderItems: List<OrderItem>.from(
-            json["orderItems"].map((x) => OrderItem.fromJson(x))),
-        orderTotal: json["orderTotal"]?.toDouble() ?? 0.0,
-        deliveryFee: json["deliveryFee"]?.toDouble() ?? 0.0,
-        grandTotal: json["grandTotal"]?.toDouble() ?? 0.0,
-        deliveryAddress: DeliveryAddress.fromJson(json["deliveryAddress"]),
-        orderStatus: json["orderStatus"],
-        storeId: StoreId.fromJson(json["storeId"]),
-        storeCoords:
-            List<double>.from(json["storeCoords"].map((x) => x?.toDouble())),
-        recipientCoords: List<double>.from(
-            json["recipientCoords"].map((x) => x?.toDouble())),
-        driverId: json["driverId"],
-        returnStatus: json["returnStatus"],
-        returnReason: json["returnReason"],
-        refundAmount: json["refundAmount"]?.toDouble(),
-        paymentStatus: json["paymentStatus"],
-        createdAt: DateTime.parse(json["createdAt"]),
-        updatedAt: DateTime.parse(json["updatedAt"]),
+        id: (json["_id"] ?? '').toString(),
+        userId: json["userId"] is Map
+            ? UserId.fromJson(_asMap(json["userId"]))
+            : UserId.empty(),
+        orderItems: json["orderItems"] is List
+            ? List<OrderItem>.from((json["orderItems"] as List)
+                .map((x) => OrderItem.fromJson(_asMap(x))))
+            : <OrderItem>[],
+        orderTotal: _toDouble(json["orderTotal"]),
+        deliveryFee: _toDouble(json["deliveryFee"]),
+        grandTotal: _toDouble(json["grandTotal"]),
+        deliveryAddress: json["deliveryAddress"] is Map
+            ? DeliveryAddress.fromJson(_asMap(json["deliveryAddress"]))
+            : DeliveryAddress.empty(),
+        orderStatus: (json["orderStatus"] ?? '').toString(),
+        storeId: json["storeId"] is Map
+            ? StoreId.fromJson(_asMap(json["storeId"]))
+            : StoreId.empty(),
+        storeCoords: json["storeCoords"] is List
+            ? List<double>.from((json["storeCoords"] as List).map(_toDouble))
+            : <double>[],
+        recipientCoords: json["recipientCoords"] is List
+            ? List<double>.from(
+                (json["recipientCoords"] as List).map(_toDouble))
+            : <double>[],
+        driverId: (json["driverId"])?.toString(),
+        proposedDriverId: (json["proposedDriverId"])?.toString(),
+        returnStatus: (json["returnStatus"])?.toString(),
+        returnReason: (json["returnReason"])?.toString(),
+        refundAmount: json["refundAmount"] == null
+            ? null
+            : _toDouble(json["refundAmount"]),
+        paymentStatus: (json["paymentStatus"])?.toString(),
+        createdAt: _parseDate(json["createdAt"]),
+        updatedAt: _parseDate(json["updatedAt"]),
       );
 
   Map<String, dynamic> toJson() => {
@@ -88,6 +127,7 @@ class OrdersModel {
         "storeCoords": List<dynamic>.from(storeCoords.map((x) => x)),
         "recipientCoords": List<dynamic>.from(recipientCoords.map((x) => x)),
         "driverId": driverId,
+        "proposedDriverId": proposedDriverId,
         "returnStatus": returnStatus,
         "returnReason": returnReason,
         "refundAmount": refundAmount,
@@ -108,9 +148,11 @@ class DeliveryAddress {
 
   factory DeliveryAddress.fromJson(Map<String, dynamic> json) =>
       DeliveryAddress(
-        id: json["_id"],
-        addressLine1: json["addressLine1"],
+        id: (json["_id"] ?? '').toString(),
+        addressLine1: (json["addressLine1"] ?? '').toString(),
       );
+
+  factory DeliveryAddress.empty() => DeliveryAddress(id: '', addressLine1: '');
 
   Map<String, dynamic> toJson() => {
         "_id": id,
@@ -136,12 +178,19 @@ class OrderItem {
   });
 
   factory OrderItem.fromJson(Map<String, dynamic> json) => OrderItem(
-        appliancesId: AppliancesId.fromJson(json["appliancesId"]),
-        quantity: json["quantity"],
-        price: json["price"]?.toDouble(),
-        additives: List<String>.from(json["additives"].map((x) => x)),
-        instructions: json["instructions"],
-        id: json["_id"],
+        appliancesId: json["appliancesId"] is Map
+            ? AppliancesId.fromJson(_asMap(json["appliancesId"]))
+            : AppliancesId.empty(),
+        quantity: json["quantity"] is int
+            ? json["quantity"]
+            : int.tryParse('${json["quantity"]}') ?? 0,
+        price: _toDouble(json["price"]),
+        additives: json["additives"] is List
+            ? List<String>.from(
+                (json["additives"] as List).map((x) => x.toString()))
+            : <String>[],
+        instructions: (json["instructions"] ?? '').toString(),
+        id: (json["_id"] ?? '').toString(),
       );
 
   Map<String, dynamic> toJson() => {
@@ -170,10 +219,13 @@ class AppliancesId {
   });
 
   factory AppliancesId.fromJson(Map<String, dynamic> json) => AppliancesId(
-        id: json["_id"],
-        title: json["title"],
-        time: json["time"],
-        imageUrl: List<String>.from(json["imageUrl"].map((x) => x)),
+        id: (json["_id"] ?? '').toString(),
+        title: (json["title"] ?? '').toString(),
+        time: (json["time"] ?? '').toString(),
+        imageUrl: json["imageUrl"] is List
+            ? List<String>.from(
+                (json["imageUrl"] as List).map((x) => x.toString()))
+            : <String>[],
         stock: (() {
           final v = json["stock"];
           if (v == null) return null;
@@ -183,6 +235,9 @@ class AppliancesId {
           return null;
         })(),
       );
+
+  factory AppliancesId.empty() => AppliancesId(
+      id: '', title: '', time: '', imageUrl: <String>[], stock: null);
 
   Map<String, dynamic> toJson() => {
         "_id": id,
@@ -211,13 +266,23 @@ class StoreId {
   });
 
   factory StoreId.fromJson(Map<String, dynamic> json) => StoreId(
-        coords: Coords.fromJson(json["coords"]),
-        id: json["_id"],
-        title: json["title"],
-        time: json["time"],
-        imageUrl: json["imageUrl"],
-        logoUrl: json["logoUrl"],
+        coords: json["coords"] is Map
+            ? Coords.fromJson(_asMap(json["coords"]))
+            : Coords.empty(),
+        id: (json["_id"] ?? '').toString(),
+        title: (json["title"] ?? '').toString(),
+        time: (json["time"] ?? '').toString(),
+        imageUrl: (json["imageUrl"] ?? '').toString(),
+        logoUrl: (json["logoUrl"] ?? '').toString(),
       );
+
+  factory StoreId.empty() => StoreId(
+      coords: Coords.empty(),
+      id: '',
+      title: '',
+      time: '',
+      imageUrl: '',
+      logoUrl: '');
 
   Map<String, dynamic> toJson() => {
         "coords": coords.toJson(),
@@ -245,12 +310,15 @@ class Coords {
   });
 
   factory Coords.fromJson(Map<String, dynamic> json) => Coords(
-        id: json["id"],
-        latitude: json["latitude"]?.toDouble(),
-        longitude: json["longitude"]?.toDouble(),
-        address: json["address"],
-        title: json["title"],
+        id: (json["id"] ?? '').toString(),
+        latitude: _toDouble(json["latitude"]),
+        longitude: _toDouble(json["longitude"]),
+        address: (json["address"] ?? '').toString(),
+        title: (json["title"] ?? '').toString(),
       );
+
+  factory Coords.empty() =>
+      Coords(id: '', latitude: 0, longitude: 0, address: '', title: '');
 
   Map<String, dynamic> toJson() => {
         "id": id,
@@ -273,14 +341,36 @@ class UserId {
   });
 
   factory UserId.fromJson(Map<String, dynamic> json) => UserId(
-        id: json["_id"],
-        phone: json["phone"],
-        profile: json["profile"],
+        id: (json["_id"] ?? '').toString(),
+        phone: (json["phone"] ?? '').toString(),
+        profile: (json["profile"] ?? '').toString(),
       );
+
+  factory UserId.empty() => UserId(id: '', phone: '', profile: '');
 
   Map<String, dynamic> toJson() => {
         "_id": id,
         "phone": phone,
         "profile": profile,
       };
+}
+
+double _toDouble(dynamic v) {
+  if (v == null) return 0.0;
+  if (v is double) return v;
+  if (v is int) return v.toDouble();
+  if (v is num) return v.toDouble();
+  if (v is String) return double.tryParse(v) ?? 0.0;
+  return 0.0;
+}
+
+DateTime _parseDate(dynamic v) {
+  if (v == null) return DateTime.fromMillisecondsSinceEpoch(0);
+  if (v is DateTime) return v;
+  if (v is String && v.isNotEmpty) {
+    try {
+      return DateTime.parse(v);
+    } catch (_) {}
+  }
+  return DateTime.fromMillisecondsSinceEpoch(0);
 }

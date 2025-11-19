@@ -28,6 +28,8 @@ class VendorOrderTile extends StatelessWidget {
         return 'Đơn hàng mới';
       case 'Preparing':
         return 'Đang chuẩn bị';
+      case 'WaitingShipper':
+        return 'Tìm shipper';
       case 'Delivering':
         return 'Đang giao hàng';
       case 'Delivered':
@@ -45,6 +47,8 @@ class VendorOrderTile extends StatelessWidget {
         return Colors.orange;
       case 'Preparing':
         return Colors.blue;
+      case 'WaitingShipper':
+        return Colors.purple;
       case 'Delivered':
         return Colors.green;
       case 'Cancelled':
@@ -178,7 +182,7 @@ class VendorOrderTile extends StatelessWidget {
                   ),
                 ),
                 ReusableText(
-                  text: "${order.grandTotal.toStringAsFixed(0)}đ",
+                  text: "${formatVND(order.grandTotal)}đ",
                   style: appStyle(14, kPrimary, FontWeight.bold),
                 ),
               ],
