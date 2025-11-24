@@ -32,6 +32,8 @@ MultiOrdersResult useMultiOrders({
   int initialLimit = 20,
   bool includeAllPayments = true,
   String? storeIdOverride,
+  List<String>? returnStatuses,
+  bool returnOnly = false,
 }) {
   final box = GetStorage();
   final ordersState = useState<List<OrdersModel>>([]);
@@ -63,8 +65,21 @@ MultiOrdersResult useMultiOrders({
     };
     final statusesParam = statuses.join(',');
     final payment = includeAllPayments ? 'all' : 'completed';
-    final url = Uri.parse(
-        '$appBaseUrl/api/orders/store/$storeId?statuses=$statusesParam&payment=$payment&page=${pageState.value}&limit=${limitState.value}');
+    final queryParams = <String, String>{
+      'payment': payment,
+      'page': '${pageState.value}',
+      'limit': '${limitState.value}',
+    };
+    if (statusesParam.isNotEmpty) {
+      queryParams['statuses'] = statusesParam;
+    }
+    if (returnStatuses != null && returnStatuses.isNotEmpty) {
+      queryParams['returnStatuses'] = returnStatuses.join(',');
+    } else if (returnOnly) {
+      queryParams['returnOnly'] = '1';
+    }
+    final url = Uri.parse('$appBaseUrl/api/orders/store/$storeId')
+        .replace(queryParameters: queryParams);
     try {
       final resp = await http.get(url, headers: headers);
       if (resp.statusCode == 200) {
@@ -109,10 +124,18 @@ MultiOrdersResult useMultiOrders({
     fetch(append: true);
   }
 
+  final returnKey = returnStatuses == null ? '' : returnStatuses.join(',');
   useEffect(() {
     fetch(append: false);
     return null;
-  }, [statuses.join(','), includeAllPayments, initialLimit, storeIdOverride]);
+  }, [
+    statuses.join(','),
+    includeAllPayments,
+    initialLimit,
+    storeIdOverride ?? '',
+    returnKey,
+    returnOnly,
+  ]);
 
   final hasMore = ordersState.value.length < totalState.value;
   return MultiOrdersResult(

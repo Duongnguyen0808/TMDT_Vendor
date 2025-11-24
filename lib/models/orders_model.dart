@@ -50,7 +50,24 @@ class OrdersModel {
   final String? returnStatus;
   final String? returnReason;
   final double? refundAmount;
+  final DateTime? returnRequestedAt;
+  final DateTime? returnProcessedAt;
+  final DateTime? refundAt;
+  final String? refundMethod;
+  final String? refundReference;
+  final String? paymentMethod;
   final String? paymentStatus;
+  final String? pickupCode;
+  final DateTime? pickupReadyAt;
+  final DateTime? pickupCodeExpiresAt;
+  final DateTime? pickupAssignedAt;
+  final DateTime? pickupCheckinAt;
+  final PickupCheckinLocation? pickupCheckinLocation;
+  final DateTime? pickupConfirmedAt;
+  final String? shopReadyBy;
+  final String? shipperPickupBy;
+  final String? pickupNotes;
+  final String? handoverPhoto;
   final DateTime createdAt;
   final DateTime updatedAt;
 
@@ -73,7 +90,24 @@ class OrdersModel {
     this.returnStatus,
     this.returnReason,
     this.refundAmount,
+    this.returnRequestedAt,
+    this.returnProcessedAt,
+    this.refundAt,
+    this.refundMethod,
+    this.refundReference,
+    this.paymentMethod,
     this.paymentStatus,
+    this.pickupCode,
+    this.pickupReadyAt,
+    this.pickupCodeExpiresAt,
+    this.pickupAssignedAt,
+    this.pickupCheckinAt,
+    this.pickupCheckinLocation,
+    this.pickupConfirmedAt,
+    this.shopReadyBy,
+    this.shipperPickupBy,
+    this.pickupNotes,
+    this.handoverPhoto,
   });
 
   factory OrdersModel.fromJson(Map<String, dynamic> json) => OrdersModel(
@@ -109,7 +143,27 @@ class OrdersModel {
         refundAmount: json["refundAmount"] == null
             ? null
             : _toDouble(json["refundAmount"]),
+        returnRequestedAt: _parseDateOrNull(json["returnRequestedAt"]),
+        returnProcessedAt: _parseDateOrNull(json["returnProcessedAt"]),
+        refundAt: _parseDateOrNull(json["refundAt"]),
+        refundMethod: _nullableString(json["refundMethod"]),
+        refundReference: _nullableString(json["refundReference"]),
+        paymentMethod: _nullableString(json["paymentMethod"]),
         paymentStatus: (json["paymentStatus"])?.toString(),
+        pickupCode: _nullableString(json["pickupCode"]),
+        pickupReadyAt: _parseDateOrNull(json["pickupReadyAt"]),
+        pickupCodeExpiresAt: _parseDateOrNull(json["pickupCodeExpiresAt"]),
+        pickupAssignedAt: _parseDateOrNull(json["pickupAssignedAt"]),
+        pickupCheckinAt: _parseDateOrNull(json["pickupCheckinAt"]),
+        pickupCheckinLocation: json["pickupCheckinLocation"] is Map
+            ? PickupCheckinLocation.fromJson(
+                _asMap(json["pickupCheckinLocation"]))
+            : null,
+        pickupConfirmedAt: _parseDateOrNull(json["pickupConfirmedAt"]),
+        shopReadyBy: _nullableString(json["shopReadyBy"]),
+        shipperPickupBy: _nullableString(json["shipperPickupBy"]),
+        pickupNotes: _nullableString(json["pickupNotes"]),
+        handoverPhoto: _nullableString(json["handoverPhoto"]),
         createdAt: _parseDate(json["createdAt"]),
         updatedAt: _parseDate(json["updatedAt"]),
       );
@@ -131,7 +185,24 @@ class OrdersModel {
         "returnStatus": returnStatus,
         "returnReason": returnReason,
         "refundAmount": refundAmount,
+        "returnRequestedAt": returnRequestedAt?.toIso8601String(),
+        "returnProcessedAt": returnProcessedAt?.toIso8601String(),
+        "refundAt": refundAt?.toIso8601String(),
+        "refundMethod": refundMethod,
+        "refundReference": refundReference,
+        "paymentMethod": paymentMethod,
         "paymentStatus": paymentStatus,
+        "pickupCode": pickupCode,
+        "pickupReadyAt": pickupReadyAt?.toIso8601String(),
+        "pickupCodeExpiresAt": pickupCodeExpiresAt?.toIso8601String(),
+        "pickupAssignedAt": pickupAssignedAt?.toIso8601String(),
+        "pickupCheckinAt": pickupCheckinAt?.toIso8601String(),
+        "pickupCheckinLocation": pickupCheckinLocation?.toJson(),
+        "pickupConfirmedAt": pickupConfirmedAt?.toIso8601String(),
+        "shopReadyBy": shopReadyBy,
+        "shipperPickupBy": shipperPickupBy,
+        "pickupNotes": pickupNotes,
+        "handoverPhoto": handoverPhoto,
         "createdAt": createdAt.toIso8601String(),
         "updatedAt": updatedAt.toIso8601String(),
       };
@@ -294,6 +365,30 @@ class StoreId {
       };
 }
 
+class PickupCheckinLocation {
+  final double latitude;
+  final double longitude;
+
+  PickupCheckinLocation({
+    required this.latitude,
+    required this.longitude,
+  });
+
+  factory PickupCheckinLocation.fromJson(Map<String, dynamic> json) =>
+      PickupCheckinLocation(
+        latitude: _toDouble(json["latitude"]),
+        longitude: _toDouble(json["longitude"]),
+      );
+
+  factory PickupCheckinLocation.empty() =>
+      PickupCheckinLocation(latitude: 0, longitude: 0);
+
+  Map<String, dynamic> toJson() => {
+        "latitude": latitude,
+        "longitude": longitude,
+      };
+}
+
 class Coords {
   final String id;
   final double latitude;
@@ -373,4 +468,21 @@ DateTime _parseDate(dynamic v) {
     } catch (_) {}
   }
   return DateTime.fromMillisecondsSinceEpoch(0);
+}
+
+DateTime? _parseDateOrNull(dynamic v) {
+  if (v == null) return null;
+  if (v is DateTime) return v;
+  if (v is String && v.isNotEmpty) {
+    try {
+      return DateTime.parse(v);
+    } catch (_) {}
+  }
+  return null;
+}
+
+String? _nullableString(dynamic v) {
+  if (v == null) return null;
+  final str = v.toString();
+  return str.isEmpty ? null : str;
 }

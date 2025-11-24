@@ -22,14 +22,18 @@ class VendorOrderTile extends StatelessWidget {
     this.onStatusChanged,
   });
 
-  String _getStatusText(String status) {
-    switch (status) {
+  String _statusText() {
+    switch (order.orderStatus) {
       case 'Pending':
         return 'Đơn hàng mới';
       case 'Preparing':
         return 'Đang chuẩn bị';
       case 'WaitingShipper':
-        return 'Tìm shipper';
+        return (order.driverId == null || order.driverId!.isEmpty)
+            ? 'Tìm shipper'
+            : 'Shipper đã nhận';
+      case 'PickedUp':
+        return 'Đang lấy hàng';
       case 'Delivering':
         return 'Đang giao hàng';
       case 'Delivered':
@@ -37,18 +41,24 @@ class VendorOrderTile extends StatelessWidget {
       case 'Cancelled':
         return 'Đã hủy';
       default:
-        return status;
+        return order.orderStatus;
     }
   }
 
-  Color _getStatusColor(String status) {
-    switch (status) {
+  Color _statusColor() {
+    switch (order.orderStatus) {
       case 'Pending':
         return Colors.orange;
       case 'Preparing':
         return Colors.blue;
       case 'WaitingShipper':
-        return Colors.purple;
+        return (order.driverId == null || order.driverId!.isEmpty)
+            ? Colors.purple
+            : Colors.teal;
+      case 'PickedUp':
+        return Colors.blueGrey;
+      case 'Delivering':
+        return Colors.green;
       case 'Delivered':
         return Colors.green;
       case 'Cancelled':
@@ -102,18 +112,18 @@ class VendorOrderTile extends StatelessWidget {
                   padding:
                       EdgeInsets.symmetric(horizontal: 12.w, vertical: 4.h),
                   decoration: BoxDecoration(
-                    color: _getStatusColor(order.orderStatus).withOpacity(0.1),
+                    color: _statusColor().withOpacity(0.1),
                     borderRadius: BorderRadius.circular(12.r),
                     border: Border.all(
-                      color: _getStatusColor(order.orderStatus),
+                      color: _statusColor(),
                       width: 1,
                     ),
                   ),
                   child: ReusableText(
-                    text: _getStatusText(order.orderStatus),
+                    text: _statusText(),
                     style: appStyle(
                       11,
-                      _getStatusColor(order.orderStatus),
+                      _statusColor(),
                       FontWeight.w600,
                     ),
                   ),

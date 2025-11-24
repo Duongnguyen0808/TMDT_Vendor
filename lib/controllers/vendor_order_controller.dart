@@ -13,9 +13,14 @@ class VendorOrderController extends GetxController {
   RxList<OrdersModel> pendingOrders = <OrdersModel>[].obs;
   RxList<OrdersModel> preparingOrders = <OrdersModel>[].obs;
   RxList<OrdersModel> waitingShipperOrders = <OrdersModel>[].obs;
+  RxList<OrdersModel> readyForPickupOrders = <OrdersModel>[].obs;
   RxList<OrdersModel> deliveringOrders = <OrdersModel>[].obs;
   RxList<OrdersModel> deliveredOrders = <OrdersModel>[].obs;
   RxList<OrdersModel> cancelledOrders = <OrdersModel>[].obs;
+
+  List<OrdersModel> _claimedWaitingOrders = <OrdersModel>[];
+  Set<String> _deliveredSnapshot = <String>{};
+  bool _deliveredInitialized = false;
 
   String get storeId => box.read('storeId') ?? '';
 
@@ -26,24 +31,99 @@ class VendorOrderController extends GetxController {
   }
 
   Future<void> fetchAllOrders() async {
-    await Future.wait([
-      fetchOrdersByStatus('Pending'),
-      fetchOrdersByStatus('Preparing'),
-      fetchOrdersByStatus('WaitingShipper'),
-      fetchOrdersByStatus('Delivering'),
-      fetchOrdersByStatus('Delivered'),
-      fetchOrdersByStatus('Cancelled'),
-    ]);
+    isLoading.value = true;
+    try {
+      await _loadStatus('Pending', pendingOrders);
+      await _loadStatus('Preparing', preparingOrders);
+      await _loadStatus('ReadyForPickup', readyForPickupOrders);
+      await _loadWaitingShipper();
+      await _loadDeliveringLikeStatuses();
+      await _loadStatus('Delivered', deliveredOrders, trackDelivered: true);
+      await _loadStatus('Cancelled', cancelledOrders);
+    } finally {
+      isLoading.value = false;
+    }
   }
 
-  Future<void> fetchOrdersByStatus(String status) async {
-    String accessToken = box.read('accessToken');
+  Future<void> _loadStatus(String status, RxList<OrdersModel> target,
+      {bool trackDelivered = false}) async {
+    final orders = await _fetchOrders(status);
+    target.value = orders;
+    if (trackDelivered) {
+      _handleDeliveredSnapshot(orders);
+    }
+  }
 
+  Future<void> _loadWaitingShipper() async {
+    final orders = await _fetchOrders('WaitingShipper');
+    final List<OrdersModel> unassigned = [];
+    final List<OrdersModel> claimed = [];
+    for (final order in orders) {
+      final driverId = order.driverId ?? '';
+      if (driverId.isEmpty) {
+        unassigned.add(order);
+      } else {
+        claimed.add(order);
+      }
+    }
+    waitingShipperOrders.value = unassigned;
+    _claimedWaitingOrders = claimed;
+  }
+
+  Future<void> _loadDeliveringLikeStatuses() async {
+    final pickedUp = await _fetchOrders('PickedUp');
+    final delivering = await _fetchOrders('Delivering');
+    final combined = [
+      ..._claimedWaitingOrders,
+      ...pickedUp,
+      ...delivering,
+    ]..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+    deliveringOrders.value = combined;
+  }
+
+  void _handleDeliveredSnapshot(List<OrdersModel> orders) {
+    final ids = orders.map((e) => e.id).where((id) => id.isNotEmpty).toSet();
+    if (_deliveredInitialized) {
+      final newlyDelivered = ids.difference(_deliveredSnapshot);
+      if (newlyDelivered.isNotEmpty) {
+        _notifyDeliveredOrders(orders, newlyDelivered);
+      }
+    } else {
+      _deliveredInitialized = true;
+    }
+    _deliveredSnapshot = ids;
+  }
+
+  void _notifyDeliveredOrders(
+      List<OrdersModel> delivered, Set<String> newlyDelivered) {
+    final recent = delivered
+        .where((order) => newlyDelivered.contains(order.id))
+        .take(3)
+        .map((order) {
+      final shortId = order.id.length > 6
+          ? order.id.substring(0, 6).toUpperCase()
+          : order.id.toUpperCase();
+      return '#$shortId';
+    }).toList();
+    if (recent.isEmpty) return;
+    final moreCount = newlyDelivered.length - recent.length;
+    final message = moreCount > 0
+        ? '${recent.join(', ')} và $moreCount đơn khác đã giao xong.'
+        : '${recent.join(', ')} đã giao xong.';
+    Get.snackbar(
+      'Shipper đã giao thành công',
+      message,
+      backgroundColor: Colors.green.shade600,
+      colorText: kLightWhite,
+      duration: const Duration(seconds: 4),
+    );
+  }
+
+  Future<List<OrdersModel>> _fetchOrders(String status) async {
+    final accessToken = box.read('accessToken');
     try {
-      // Dùng advanced endpoint để đảm bảo thấy cả đơn chưa Completed (payment=all)
       final url = Uri.parse(
           '$appBaseUrl/api/orders/store/$storeId?statuses=$status&payment=all&page=1&limit=100');
-
       final response = await http.get(
         url,
         headers: {
@@ -56,41 +136,76 @@ class VendorOrderController extends GetxController {
         final Map<String, dynamic> wrapper = jsonDecode(response.body);
         final List<dynamic> data =
             (wrapper['data'] is List) ? wrapper['data'] : [];
-        final List<OrdersModel> orders = data
+        return data
             .map(
                 (json) => OrdersModel.fromJson(Map<String, dynamic>.from(json)))
             .toList();
-
-        switch (status) {
-          case 'Pending':
-            pendingOrders.value = orders;
-            break;
-          case 'Preparing':
-            preparingOrders.value = orders;
-            break;
-          case 'WaitingShipper':
-            waitingShipperOrders.value = orders;
-            break;
-          case 'Delivering':
-            deliveringOrders.value = orders;
-            break;
-          case 'Delivered':
-            deliveredOrders.value = orders;
-            break;
-          case 'Cancelled':
-            cancelledOrders.value = orders;
-            break;
-        }
-      } else {
-        print(
-            '[VendorOrderController][fetchOrdersByStatus] HTTP ${response.statusCode} body=${response.body}');
       }
+
+      print(
+          '[VendorOrderController][_fetchOrders] HTTP ${response.statusCode} body=${response.body}');
     } catch (e) {
       print('Error fetching $status orders: $e');
     }
+    return <OrdersModel>[];
   }
 
-  Future<void> updateOrderStatus(String orderId, String newStatus) async {
+  Future<Map<String, dynamic>?> markReadyForPickup(String orderId) async {
+    return _postPickupAction(
+      orderId: orderId,
+      endpoint: 'ready-for-pickup',
+      successTitle: 'Đã phát mã',
+    );
+  }
+
+  Future<Map<String, dynamic>?> regeneratePickupCode(String orderId) async {
+    return _postPickupAction(
+      orderId: orderId,
+      endpoint: 'pickup-code/regenerate',
+      successTitle: 'Tạo mã mới',
+    );
+  }
+
+  Future<Map<String, dynamic>?> _postPickupAction({
+    required String orderId,
+    required String endpoint,
+    required String successTitle,
+  }) async {
+    final accessToken = box.read('accessToken');
+    try {
+      final url = Uri.parse('$appBaseUrl/api/orders/$orderId/$endpoint');
+      final response = await http.post(
+        url,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $accessToken',
+        },
+      );
+      Map<String, dynamic> data = {};
+      try {
+        final decoded = jsonDecode(response.body);
+        if (decoded is Map<String, dynamic>) data = decoded;
+      } catch (_) {}
+
+      if (response.statusCode == 200 && (data['status'] == true)) {
+        Get.snackbar(successTitle, data['message'] ?? 'Thành công',
+            backgroundColor: kPrimary, colorText: kLightWhite);
+        await fetchAllOrders();
+        return data;
+      }
+
+      final message = (data['message'] ?? 'Không thể xử lý yêu cầu').toString();
+      Get.snackbar('Lỗi', message,
+          backgroundColor: kRed, colorText: kLightWhite);
+    } catch (e) {
+      Get.snackbar('Lỗi', 'Kết nối thất bại: $e',
+          backgroundColor: kRed, colorText: kLightWhite);
+    }
+    return null;
+  }
+
+  Future<bool> updateOrderStatus(String orderId, String newStatus,
+      {bool shouldPop = true}) async {
     String accessToken = box.read('accessToken');
     isLoading.value = true;
 
@@ -116,8 +231,13 @@ class VendorOrderController extends GetxController {
         // Refresh orders
         await fetchAllOrders();
 
-        // Go back
-        Get.back();
+        if (shouldPop) {
+          final navigator = Get.key.currentState;
+          if (navigator?.canPop() ?? false) {
+            navigator!.pop();
+          }
+        }
+        return true;
       } else {
         print(
             '[VendorOrderController][updateOrderStatus] HTTP ${response.statusCode} body=${response.body}');
@@ -138,6 +258,7 @@ class VendorOrderController extends GetxController {
     } finally {
       isLoading.value = false;
     }
+    return false;
   }
 
   // Convenience: approve đơn Pending -> chuyển Preparing
@@ -149,6 +270,7 @@ class VendorOrderController extends GetxController {
     const flow = [
       'Pending',
       'Preparing',
+      'ReadyForPickup',
       'WaitingShipper',
       'Delivering',
       'Delivered'

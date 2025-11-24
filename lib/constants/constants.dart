@@ -36,7 +36,7 @@ double width = 428.w;
 
 // final String appBaseUrl =
 //     Platform.isAndroid ? "http://10.0.2.2:6013" : "http://localhost:6013";
-final String appBaseUrl = "http://192.168.1.7:6013";
+final String appBaseUrl = "http://192.168.1.5:6013";
 
 List<String> orderList = [
   "Đơn mới",

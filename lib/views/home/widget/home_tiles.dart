@@ -7,7 +7,9 @@ import 'package:appliances_flutter/views/add_appliances/add_appliances.dart';
 import 'package:appliances_flutter/views/appliances/appliances_list.dart';
 import 'package:appliances_flutter/views/wallet/wallet_page.dart';
 import 'package:appliances_flutter/views/orders/orders_page.dart';
+import 'package:appliances_flutter/views/orders/return_center_page.dart';
 import 'package:appliances_flutter/views/profile/vendor_profile_page.dart';
+import 'package:appliances_flutter/views/support/service_center_page.dart';
 
 class HomeTiles extends StatelessWidget {
   const HomeTiles({
@@ -43,6 +45,14 @@ class HomeTiles extends StatelessWidget {
           icon: Icons.local_shipping),
       HomeTile(
           onTap: () {
+            Get.to(() => const ReturnCenterPage(),
+                transition: Transition.fadeIn,
+                duration: const Duration(milliseconds: 600));
+          },
+          text: "Trả hàng",
+          icon: Icons.assignment_return),
+      HomeTile(
+          onTap: () {
             Get.to(() => const WalletPage(),
                 transition: Transition.fadeIn,
                 duration: const Duration(milliseconds: 600));
@@ -57,6 +67,14 @@ class HomeTiles extends StatelessWidget {
           },
           text: "Hồ sơ",
           icon: Icons.storefront),
+      HomeTile(
+          onTap: () {
+            Get.to(() => const ServiceCenterPage(),
+                transition: Transition.fadeIn,
+                duration: const Duration(milliseconds: 600));
+          },
+          text: "Dịch vụ",
+          icon: Icons.support_agent),
     ];
 
     return Container(

@@ -32,6 +32,10 @@ class OrderDetailPage extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   _buildHeaderStatus(),
+                  if (order.pickupCheckinAt != null) ...[
+                    SizedBox(height: 12.h),
+                    _buildShipperArrivalCard(),
+                  ],
                   SizedBox(height: 16.h),
                   _buildCustomerInfo(),
                   SizedBox(height: 16.h),
@@ -74,29 +78,54 @@ class OrderDetailPage extends StatelessWidget {
   }
 
   Widget _buildHeaderStatus() {
+    final hasDriver = order.driverId != null && order.driverId!.isNotEmpty;
     Color statusColor;
+    String statusLabel;
+    String? statusNote;
+
     switch (order.orderStatus) {
       case 'Pending':
         statusColor = Colors.orange;
+        statusLabel = 'Đơn hàng mới';
         break;
       case 'Preparing':
         statusColor = Colors.blue;
+        statusLabel = 'Đang chuẩn bị';
         break;
       case 'WaitingShipper':
-        statusColor = Colors.purple;
+        if (hasDriver) {
+          statusColor = Colors.teal;
+          statusLabel = 'Shipper đã nhận';
+          statusNote = 'Tài xế đang trên đường đến cửa hàng để nhận hàng.';
+        } else {
+          statusColor = Colors.purple;
+          statusLabel = 'Đang tìm shipper';
+          statusNote =
+              'Hệ thống sẽ tiếp tục tìm tài xế sẵn sàng nhận đơn cho bạn.';
+        }
+        break;
+      case 'PickedUp':
+        statusColor = Colors.blueGrey;
+        statusLabel = 'Đang lấy hàng';
+        statusNote = 'Shipper đang bàn giao hàng với cửa hàng.';
         break;
       case 'Delivering':
         statusColor = Colors.green;
+        statusLabel = 'Đang giao hàng';
         break;
       case 'Delivered':
         statusColor = Colors.teal;
+        statusLabel = 'Đã giao hàng';
         break;
       case 'Cancelled':
         statusColor = Colors.red;
+        statusLabel = 'Đã hủy';
         break;
       default:
         statusColor = kPrimary;
+        statusLabel = order.orderStatus;
     }
+
     return Container(
       padding: EdgeInsets.all(16.w),
       decoration: BoxDecoration(
@@ -114,28 +143,62 @@ class OrderDetailPage extends StatelessWidget {
               SizedBox(width: 8.w),
               Expanded(
                 child: ReusableText(
-                  text: 'Trạng thái: ${order.orderStatus}',
+                  text: 'Trạng thái: $statusLabel',
                   style: appStyle(13, kDark, FontWeight.w600),
                 ),
               ),
             ],
           ),
           SizedBox(height: 8.h),
-          if (order.orderStatus == 'WaitingShipper') ...[
+          if (statusNote != null) ...[
             ReusableText(
-              text: (order.proposedDriverId != null &&
-                      order.proposedDriverId!.isNotEmpty)
-                  ? 'Đã đề xuất cho tài xế, chờ phản hồi...'
-                  : 'Đang tìm tài xế khả dụng gần nhất...',
+              text: statusNote,
               style: appStyle(12, kDark, FontWeight.w500),
             ),
             SizedBox(height: 6.h),
-            ReusableText(
-              text:
-                  'Nếu tài xế từ chối hoặc hết thời gian, hệ thống sẽ xoay sang người khác tự động.',
-              style: appStyle(11, kGray, FontWeight.w400),
-            ),
           ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildShipperArrivalCard() {
+    final checkin = order.pickupCheckinAt;
+    if (checkin == null) return const SizedBox.shrink();
+    return Container(
+      padding: EdgeInsets.all(14.w),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(16.r),
+        color: Colors.blueGrey.withOpacity(.08),
+        border: Border.all(color: Colors.blueGrey.withOpacity(.2)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(Icons.directions_bike, color: Colors.blueGrey.shade600),
+          SizedBox(width: 12.w),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                ReusableText(
+                  text: 'Shipper đã báo có mặt',
+                  style: appStyle(13, kDark, FontWeight.w600),
+                ),
+                SizedBox(height: 4.h),
+                ReusableText(
+                  text:
+                      'Vui lòng bàn giao hàng và xác nhận "ĐÃ GIAO HÀNG CHO SHIPPER".',
+                  style: appStyle(12, kGray, FontWeight.w400),
+                ),
+                SizedBox(height: 4.h),
+                ReusableText(
+                  text: 'Thời gian: ${_formatDateTime(checkin)}',
+                  style: appStyle(12, kGray, FontWeight.w500),
+                ),
+              ],
+            ),
+          ),
         ],
       ),
     );
@@ -408,6 +471,7 @@ class OrderDetailPage extends StatelessWidget {
   Widget _buildActionButtons(
       BuildContext context, VendorOrderController controller) {
     final width = MediaQuery.of(context).size.width;
+    final hasDriver = order.driverId != null && order.driverId!.isNotEmpty;
     switch (order.orderStatus) {
       case 'Pending':
         return CustomButton(
@@ -416,9 +480,7 @@ class OrderDetailPage extends StatelessWidget {
           btnColor: kPrimary,
           btnHieght: 45,
           btnRadius: 12,
-          onTap: () async {
-            await controller.updateOrderStatus(order.id, 'Preparing');
-          },
+          onTap: () => _handleStatusUpdate(controller, 'Preparing'),
         );
       case 'Preparing':
         return CustomButton(
@@ -427,32 +489,57 @@ class OrderDetailPage extends StatelessWidget {
           btnColor: kPrimary,
           btnHieght: 45,
           btnRadius: 12,
-          onTap: () async {
-            await controller.updateOrderStatus(order.id, 'WaitingShipper');
-          },
+          onTap: () => _handleStatusUpdate(controller, 'WaitingShipper'),
         );
       case 'WaitingShipper':
         return CustomButton(
-          text: 'ĐANG TÌM SHIPPER...',
+          text: hasDriver ? 'ĐÃ GIAO HÀNG CHO SHIPPER' : 'ĐANG TÌM SHIPPER...',
           btnWidth: width,
-          btnColor: kGrayLight,
+          btnColor: hasDriver ? Colors.teal : kGrayLight,
           btnHieght: 45,
           btnRadius: 12,
-          onTap: () {},
+          onTap: hasDriver
+              ? () => _handleStatusUpdate(controller, 'Delivering')
+              : null,
         );
+      case 'PickedUp':
       case 'Delivering':
-        return CustomButton(
-          text: 'ĐÃ GIAO HÀNG',
-          btnWidth: width,
-          btnColor: Colors.green,
-          btnHieght: 45,
-          btnRadius: 12,
-          onTap: () async {
-            await controller.updateOrderStatus(order.id, 'Delivered');
-          },
+        return Container(
+          width: width,
+          padding: EdgeInsets.all(14.w),
+          decoration: BoxDecoration(
+            color: Colors.orange.shade50,
+            borderRadius: BorderRadius.circular(12.r),
+            border: Border.all(color: Colors.orange.shade200),
+          ),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Icon(Icons.info_outline, color: Colors.orange),
+              SizedBox(width: 8.w),
+              Expanded(
+                child: ReusableText(
+                  text:
+                      'Shipper sẽ xác nhận "Đã giao hàng" trong ứng dụng tài xế. Shop chỉ cần chờ cập nhật tự động.',
+                  style: appStyle(12, kDark, FontWeight.w500),
+                ),
+              ),
+            ],
+          ),
         );
       default:
         return const SizedBox.shrink();
+    }
+  }
+
+  Future<void> _handleStatusUpdate(
+      VendorOrderController controller, String newStatus) async {
+    final ok = await controller.updateOrderStatus(order.id, newStatus,
+        shouldPop: false);
+    if (!ok) return;
+    final refreshed = await controller.fetchOrderDetail(order.id);
+    if (refreshed != null) {
+      Get.off(() => OrderDetailPage(order: refreshed));
     }
   }
 
@@ -539,5 +626,11 @@ class OrderDetailPage extends StatelessWidget {
       default:
         return 'Không có yêu cầu';
     }
+  }
+
+  String _formatDateTime(DateTime dateTime) {
+    final local = dateTime.toLocal();
+    String two(int v) => v.toString().padLeft(2, '0');
+    return '${two(local.day)}/${two(local.month)} ${two(local.hour)}:${two(local.minute)}';
   }
 }
