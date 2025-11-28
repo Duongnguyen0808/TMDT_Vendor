@@ -21,6 +21,31 @@ class _OrderDetailPageState extends State<OrderDetailPage> {
   bool loading = true;
   String? error;
   bool pickupActionLoading = false;
+  String _proofStatusLabel(String status) {
+    switch (status) {
+      case 'Pending':
+        return 'Chờ xác nhận';
+      case 'Confirmed':
+        return 'Đã xác nhận';
+      case 'Rejected':
+        return 'Đã từ chối';
+      default:
+        return 'Chưa có cập nhật';
+    }
+  }
+
+  Color _proofStatusColor(String status) {
+    switch (status) {
+      case 'Pending':
+        return Colors.amber.shade800;
+      case 'Confirmed':
+        return Colors.green.shade600;
+      case 'Rejected':
+        return Colors.red.shade400;
+      default:
+        return Colors.blueGrey;
+    }
+  }
 
   String _paymentStatusLabel(String? raw) {
     switch ((raw ?? '').toLowerCase()) {
@@ -135,6 +160,55 @@ class _OrderDetailPageState extends State<OrderDetailPage> {
     await _handlePickupAction(() => ctrl.regeneratePickupCode(currentOrder.id));
   }
 
+  Future<void> _reviewDeliveryProof(bool approve) async {
+    final current = order;
+    if (current == null) return;
+    String note = '';
+    if (!approve) {
+      final typed = await _askRejectNote();
+      if (typed == null) return;
+      note = typed;
+    }
+    final ok = await ctrl.reviewDeliveryProof(
+      current.id,
+      approve: approve,
+      note: note,
+    );
+    if (ok) {
+      await _load();
+    }
+  }
+
+  Future<String?> _askRejectNote() async {
+    final controller = TextEditingController();
+    final result = await showDialog<String>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Lý do từ chối'),
+        content: TextField(
+          controller: controller,
+          maxLines: 3,
+          decoration: const InputDecoration(
+            hintText: 'Ghi lại lý do shop chưa chấp nhận bằng chứng',
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Huỷ'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.of(context).pop(controller.text.trim()),
+            child: const Text('Gửi'),
+          ),
+        ],
+      ),
+    );
+    if (result == null) return null;
+    final trimmed = result.trim();
+    return trimmed.isEmpty ? null : trimmed;
+  }
+
   Future<void> _copyPickupCode() async {
     final code = order?.pickupCode;
     if (code == null || code.isEmpty) return;
@@ -165,6 +239,11 @@ class _OrderDetailPageState extends State<OrderDetailPage> {
   }
 
   String _formatLatLng(PickupCheckinLocation? loc) {
+    if (loc == null) return '';
+    return '(${loc.latitude.toStringAsFixed(5)}, ${loc.longitude.toStringAsFixed(5)})';
+  }
+
+  String _formatProofLocation(DeliveryProofLocation? loc) {
     if (loc == null) return '';
     return '(${loc.latitude.toStringAsFixed(5)}, ${loc.longitude.toStringAsFixed(5)})';
   }
@@ -312,6 +391,140 @@ class _OrderDetailPageState extends State<OrderDetailPage> {
     );
   }
 
+  Widget _buildDeliveryProofCard(OrdersModel o) {
+    final proofPhoto = (o.deliveryProofPhoto ?? '').trim();
+    final statusRaw = (o.shopDeliveryConfirmStatus ?? '').isEmpty
+        ? (proofPhoto.isNotEmpty ? 'Pending' : 'None')
+        : o.shopDeliveryConfirmStatus!;
+    if (proofPhoto.isEmpty && statusRaw == 'None') {
+      return const SizedBox.shrink();
+    }
+    final statusLabel = _proofStatusLabel(statusRaw);
+    final statusColor = _proofStatusColor(statusRaw);
+    final showActions = proofPhoto.isNotEmpty &&
+        (statusRaw == 'Pending' || statusRaw == 'Rejected');
+
+    return Obx(() {
+      final reviewing = ctrl.reviewingOrderId.value == o.id;
+      return Card(
+        elevation: 1,
+        margin: const EdgeInsets.symmetric(vertical: 12),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  const Icon(Icons.photo_camera_back_outlined, color: kPrimary),
+                  const SizedBox(width: 8),
+                  Text('Bằng chứng giao hàng',
+                      style: appStyle(15, kDark, FontWeight.w700)),
+                  const Spacer(),
+                  Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: statusColor.withOpacity(.15),
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    child: Text(
+                      statusLabel,
+                      style: appStyle(12, statusColor, FontWeight.w600),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              if (proofPhoto.isNotEmpty)
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(12),
+                  child: AspectRatio(
+                    aspectRatio: 4 / 3,
+                    child: Image.network(
+                      proofPhoto,
+                      fit: BoxFit.cover,
+                      errorBuilder: (_, __, ___) => Container(
+                        color: kGrayLight,
+                        alignment: Alignment.center,
+                        child: const Icon(Icons.broken_image, size: 32),
+                      ),
+                    ),
+                  ),
+                ),
+              if (proofPhoto.isNotEmpty) const SizedBox(height: 12),
+              if ((o.deliveryProofRecipient ?? '').isNotEmpty)
+                _pickupInfoRow('Người nhận', o.deliveryProofRecipient!,
+                    icon: Icons.person_outline),
+              if ((o.deliveryProofNote ?? '').isNotEmpty)
+                _pickupInfoRow('Ghi chú', o.deliveryProofNote!,
+                    icon: Icons.sticky_note_2_outlined),
+              if (o.deliveryProofAt != null)
+                _pickupInfoRow(
+                    'Shipper gửi lúc', _formatDate(o.deliveryProofAt),
+                    icon: Icons.schedule_outlined),
+              if (o.deliveryProofLocation != null)
+                _pickupInfoRow(
+                  'Tọa độ',
+                  _formatProofLocation(o.deliveryProofLocation),
+                  icon: Icons.my_location,
+                ),
+              if (statusRaw == 'Rejected' &&
+                  (o.shopDeliveryRejectReason ?? '').isNotEmpty)
+                Padding(
+                  padding: const EdgeInsets.only(top: 8),
+                  child: Text(
+                    'Shop đã từ chối: ${o.shopDeliveryRejectReason}',
+                    style: appStyle(12, Colors.red.shade600, FontWeight.w500),
+                  ),
+                ),
+              if (statusRaw == 'Pending')
+                Padding(
+                  padding: const EdgeInsets.only(top: 8),
+                  child: Text(
+                    'Shipper đã gửi ảnh bàn giao, hãy xác nhận sớm để hoàn tất đơn.',
+                    style:
+                        appStyle(12, Colors.orange.shade700, FontWeight.w500),
+                  ),
+                ),
+              if (statusRaw == 'Confirmed')
+                Padding(
+                  padding: const EdgeInsets.only(top: 8),
+                  child: Text(
+                    'Bạn đã xác nhận khách đã nhận hàng. Shipper sẽ được thanh toán.',
+                    style: appStyle(12, Colors.green.shade700, FontWeight.w500),
+                  ),
+                ),
+              if (reviewing)
+                const Padding(
+                  padding: EdgeInsets.only(top: 12),
+                  child: LinearProgressIndicator(minHeight: 2),
+                )
+              else if (showActions) ...[
+                const SizedBox(height: 12),
+                ElevatedButton.icon(
+                  onPressed: () => _reviewDeliveryProof(true),
+                  icon: const Icon(Icons.verified_outlined),
+                  label: Text(statusRaw == 'Rejected'
+                      ? 'Chấp nhận lại'
+                      : 'Xác nhận khách đã nhận'),
+                ),
+                const SizedBox(height: 8),
+                OutlinedButton.icon(
+                  onPressed: () => _reviewDeliveryProof(false),
+                  icon: const Icon(Icons.block),
+                  label: Text(statusRaw == 'Rejected'
+                      ? 'Giữ nguyên từ chối'
+                      : 'Từ chối bằng chứng'),
+                ),
+              ]
+            ],
+          ),
+        ),
+      );
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     final current = order?.orderStatus ?? '';
@@ -360,6 +573,7 @@ class _OrderDetailPageState extends State<OrderDetailPage> {
                         const Divider(height: 24),
                         if (_shouldShowPickupCard(order!))
                           _buildPickupCard(order!),
+                        _buildDeliveryProofCard(order!),
                         const Divider(height: 24),
                         Text('Sản phẩm:',
                             style: appStyle(13, kDark, FontWeight.w600)),

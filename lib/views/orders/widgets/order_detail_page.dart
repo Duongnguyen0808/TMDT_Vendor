@@ -7,10 +7,50 @@ import 'package:appliances_flutter/common/reusable_text.dart';
 import 'package:appliances_flutter/constants/constants.dart';
 import 'package:appliances_flutter/models/orders_model.dart';
 import 'package:appliances_flutter/controllers/vendor_order_controller.dart';
+import 'package:appliances_flutter/views/orders/widgets/order_invoice_page.dart';
+import '../order_detail_page.dart' as full_detail;
 
-class OrderDetailPage extends StatelessWidget {
+class OrderDetailPage extends StatefulWidget {
   final OrdersModel order;
   const OrderDetailPage({super.key, required this.order});
+
+  @override
+  State<OrderDetailPage> createState() => _OrderDetailPageState();
+}
+
+class _OrderDetailPageState extends State<OrderDetailPage> {
+  late OrdersModel _order;
+  OrdersModel get order => _order;
+
+  @override
+  void initState() {
+    super.initState();
+    _order = widget.order;
+  }
+
+  bool get _hasProofMedia => (order.deliveryProofPhoto ?? '').isNotEmpty;
+
+  bool get _canOpenProofReviewAction =>
+      _hasProofMedia ||
+      (order.shopDeliveryConfirmStatus ?? '').isNotEmpty ||
+      (order.deliveryProofNote ?? '').isNotEmpty ||
+      (order.deliveryProofRecipient ?? '').isNotEmpty ||
+      order.deliveryProofAt != null;
+
+  void _openProofReview() {
+    if (!Get.isRegistered<VendorOrderController>()) {
+      Get.put(VendorOrderController());
+    }
+    Get.to(
+      () => full_detail.OrderDetailPage(orderId: order.id),
+      preventDuplicates: false,
+      routeName: '/vendor/order/${order.id}/proof',
+    );
+  }
+
+  void _openInvoicePage() {
+    Get.to(() => OrderInvoicePage(order: order));
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -49,8 +89,7 @@ class OrderDetailPage extends StatelessWidget {
               ),
             ),
           ),
-          if (order.orderStatus != 'Delivered' &&
-              order.orderStatus != 'Cancelled')
+          if (_shouldShowBottomActions)
             Positioned(
               left: 0,
               right: 0,
@@ -75,6 +114,13 @@ class OrderDetailPage extends StatelessWidget {
         ],
       ),
     );
+  }
+
+  bool get _shouldShowBottomActions {
+    final isTerminal =
+        order.orderStatus == 'Delivered' || order.orderStatus == 'Cancelled';
+    if (!isTerminal) return true;
+    return _canOpenProofReviewAction;
   }
 
   Widget _buildHeaderStatus() {
@@ -472,6 +518,7 @@ class OrderDetailPage extends StatelessWidget {
       BuildContext context, VendorOrderController controller) {
     final width = MediaQuery.of(context).size.width;
     final hasDriver = order.driverId != null && order.driverId!.isNotEmpty;
+    final hasProof = _hasProofMedia;
     switch (order.orderStatus) {
       case 'Pending':
         return CustomButton(
@@ -480,16 +527,35 @@ class OrderDetailPage extends StatelessWidget {
           btnColor: kPrimary,
           btnHieght: 45,
           btnRadius: 12,
-          onTap: () => _handleStatusUpdate(controller, 'Preparing'),
+          onTap: () => _handleStatusUpdate(
+            controller,
+            'Preparing',
+            popAfterSuccess: true,
+          ),
         );
       case 'Preparing':
-        return CustomButton(
-          text: 'TÌM SHIPPER',
-          btnWidth: width,
-          btnColor: kPrimary,
-          btnHieght: 45,
-          btnRadius: 12,
-          onTap: () => _handleStatusUpdate(controller, 'WaitingShipper'),
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            CustomButton(
+              text: 'TÌM SHIPPER',
+              btnWidth: width,
+              btnColor: kPrimary,
+              btnHieght: 45,
+              btnRadius: 12,
+              onTap: () => _handleStatusUpdate(
+                controller,
+                'WaitingShipper',
+                popAfterSuccess: true,
+              ),
+            ),
+            SizedBox(height: 12.h),
+            OutlinedButton.icon(
+              onPressed: _openInvoicePage,
+              icon: const Icon(Icons.receipt_long_outlined),
+              label: const Text('TẠO HÓA ĐƠN GIAO HÀNG'),
+            ),
+          ],
         );
       case 'WaitingShipper':
         return CustomButton(
@@ -499,47 +565,102 @@ class OrderDetailPage extends StatelessWidget {
           btnHieght: 45,
           btnRadius: 12,
           onTap: hasDriver
-              ? () => _handleStatusUpdate(controller, 'Delivering')
+              ? () => _handleStatusUpdate(
+                    controller,
+                    'Delivering',
+                    popAfterSuccess: true,
+                  )
               : null,
         );
       case 'PickedUp':
       case 'Delivering':
-        return Container(
-          width: width,
-          padding: EdgeInsets.all(14.w),
-          decoration: BoxDecoration(
-            color: Colors.orange.shade50,
-            borderRadius: BorderRadius.circular(12.r),
-            border: Border.all(color: Colors.orange.shade200),
-          ),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Icon(Icons.info_outline, color: Colors.orange),
-              SizedBox(width: 8.w),
-              Expanded(
-                child: ReusableText(
-                  text:
-                      'Shipper sẽ xác nhận "Đã giao hàng" trong ứng dụng tài xế. Shop chỉ cần chờ cập nhật tự động.',
-                  style: appStyle(12, kDark, FontWeight.w500),
-                ),
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Container(
+              width: width,
+              padding: EdgeInsets.all(14.w),
+              decoration: BoxDecoration(
+                color: Colors.orange.shade50,
+                borderRadius: BorderRadius.circular(12.r),
+                border: Border.all(color: Colors.orange.shade200),
               ),
-            ],
-          ),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Icon(Icons.info_outline, color: Colors.orange),
+                  SizedBox(width: 8.w),
+                  Expanded(
+                    child: ReusableText(
+                      text:
+                          'Shipper sẽ xác nhận "Đã giao hàng" trong ứng dụng tài xế. Shop có thể mở ảnh bằng chứng để duyệt.',
+                      style: appStyle(12, kDark, FontWeight.w500),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            SizedBox(height: 12.h),
+            _buildProofReviewButton(
+              hasProof: hasProof,
+              showMissingNote: true,
+            ),
+          ],
         );
       default:
+        if (_canOpenProofReviewAction) {
+          return _buildProofReviewButton(
+            hasProof: hasProof,
+            showMissingNote: true,
+          );
+        }
         return const SizedBox.shrink();
     }
   }
 
+  Widget _buildProofReviewButton({
+    required bool hasProof,
+    bool showMissingNote = false,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        ElevatedButton.icon(
+          onPressed: _openProofReview,
+          icon: const Icon(Icons.photo_library_outlined),
+          label: Text(
+            hasProof ? 'Xem ảnh shipper gửi' : 'Mở trang duyệt ảnh bàn giao',
+          ),
+        ),
+        if (showMissingNote && !hasProof)
+          Padding(
+            padding: EdgeInsets.only(top: 6.h),
+            child: ReusableText(
+              text:
+                  'Chưa thấy ảnh bàn giao? Hãy thử lại sau khi shipper tải lên.',
+              style: appStyle(11, kGray, FontWeight.w400),
+            ),
+          ),
+      ],
+    );
+  }
+
   Future<void> _handleStatusUpdate(
-      VendorOrderController controller, String newStatus) async {
-    final ok = await controller.updateOrderStatus(order.id, newStatus,
-        shouldPop: false);
-    if (!ok) return;
+    VendorOrderController controller,
+    String newStatus, {
+    bool popAfterSuccess = false,
+  }) async {
+    final ok = await controller.updateOrderStatus(
+      order.id,
+      newStatus,
+      shouldPop: popAfterSuccess,
+    );
+    if (!ok || popAfterSuccess) return;
     final refreshed = await controller.fetchOrderDetail(order.id);
-    if (refreshed != null) {
-      Get.off(() => OrderDetailPage(order: refreshed));
+    if (refreshed != null && mounted) {
+      setState(() {
+        _order = refreshed;
+      });
     }
   }
 

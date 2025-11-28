@@ -7,7 +7,10 @@ import 'package:appliances_flutter/common/app_style.dart';
 import 'package:appliances_flutter/common/reusable_text.dart';
 import 'package:appliances_flutter/constants/constants.dart';
 import 'package:appliances_flutter/models/orders_model.dart';
+import 'package:appliances_flutter/views/orders/delivery_issue_dashboard_page.dart';
 import 'package:appliances_flutter/views/orders/order_detail_page.dart';
+import 'package:appliances_flutter/views/orders/pending_delivery_proof_page.dart';
+import 'package:appliances_flutter/views/orders/vendor_rating_center_page.dart';
 
 class OrdersDashboardPage extends HookWidget {
   const OrdersDashboardPage({super.key});
@@ -28,6 +31,50 @@ class OrdersDashboardPage extends HookWidget {
       child: Scaffold(
         appBar: AppBar(
           title: const Text('Quản lý đơn hàng'),
+          actions: [
+            IconButton(
+              tooltip: 'Đánh giá đối tác',
+              onPressed: () => Get.to(() => const VendorRatingCenterPage()),
+              icon: const Icon(Icons.star_rate_rounded),
+            ),
+            IconButton(
+              tooltip: 'Dashboard cảnh báo',
+              onPressed: () => Get.to(() => const DeliveryIssueDashboardPage()),
+              icon: const Icon(Icons.monitor_heart),
+            ),
+            Obx(() {
+              final pendingCount = ctrl.pendingProofOrders.length;
+              final isLoading = ctrl.pendingProofLoading.value;
+              return IconButton(
+                tooltip: 'Bằng chứng chờ duyệt',
+                onPressed: () => Get.to(() => PendingDeliveryProofPage()),
+                icon: Stack(
+                  clipBehavior: Clip.none,
+                  children: [
+                    Icon(isLoading ? Icons.sync : Icons.assignment_turned_in),
+                    if (pendingCount > 0)
+                      Positioned(
+                        right: -6,
+                        top: -4,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 5, vertical: 2),
+                          decoration: const BoxDecoration(
+                            color: kRed,
+                            shape: BoxShape.rectangle,
+                            borderRadius: BorderRadius.all(Radius.circular(10)),
+                          ),
+                          child: Text(
+                            pendingCount > 99 ? '99+' : '$pendingCount',
+                            style: appStyle(10, kLightWhite, FontWeight.bold),
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+              );
+            }),
+          ],
           bottom: TabBar(
             isScrollable: true,
             tabs: [for (final t in tabs) Tab(text: t.label)],

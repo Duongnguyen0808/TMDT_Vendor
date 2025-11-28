@@ -17,10 +17,16 @@ class VendorOrderController extends GetxController {
   RxList<OrdersModel> deliveringOrders = <OrdersModel>[].obs;
   RxList<OrdersModel> deliveredOrders = <OrdersModel>[].obs;
   RxList<OrdersModel> cancelledOrders = <OrdersModel>[].obs;
+  RxList<OrdersModel> pendingProofOrders = <OrdersModel>[].obs;
+  RxBool pendingProofLoading = false.obs;
+  RxString reviewingOrderId = ''.obs;
+  RxString disputeActionOrderId = ''.obs;
 
   List<OrdersModel> _claimedWaitingOrders = <OrdersModel>[];
   Set<String> _deliveredSnapshot = <String>{};
   bool _deliveredInitialized = false;
+  Set<String> _pendingProofSnapshot = <String>{};
+  bool _pendingProofInitialized = false;
 
   String get storeId => box.read('storeId') ?? '';
 
@@ -28,6 +34,57 @@ class VendorOrderController extends GetxController {
   void onInit() {
     super.onInit();
     fetchAllOrders();
+  }
+
+  Future<bool> reviewDeliveryDispute(String orderId,
+      {required bool resolve, String note = ''}) async {
+    final accessToken = box.read('accessToken');
+    if (accessToken == null) return false;
+    disputeActionOrderId.value = orderId;
+    try {
+      final url =
+          Uri.parse('$appBaseUrl/api/orders/$orderId/delivery-dispute/review');
+      final body = <String, dynamic>{
+        'action': resolve ? 'resolve' : 'reject',
+      };
+      if (note.isNotEmpty) body['note'] = note;
+
+      final resp = await http.post(
+        url,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $accessToken',
+        },
+        body: jsonEncode(body),
+      );
+
+      Map<String, dynamic> data = {};
+      try {
+        data = Map<String, dynamic>.from(jsonDecode(resp.body));
+      } catch (_) {}
+
+      if (resp.statusCode == 200 && (data['status'] == true)) {
+        Get.snackbar(
+          'Thành công',
+          resolve ? 'Đã đánh dấu tranh chấp đã xử lý' : 'Đã từ chối tranh chấp',
+          backgroundColor: kPrimary,
+          colorText: kLightWhite,
+        );
+        await fetchAllOrders();
+        return true;
+      } else {
+        final message =
+            (data['message'] ?? 'Không thể xử lý tranh chấp').toString();
+        Get.snackbar('Lỗi', message,
+            backgroundColor: kRed, colorText: kLightWhite);
+      }
+    } catch (e) {
+      Get.snackbar('Lỗi', 'Kết nối thất bại: $e',
+          backgroundColor: kRed, colorText: kLightWhite);
+    } finally {
+      disputeActionOrderId.value = '';
+    }
+    return false;
   }
 
   Future<void> fetchAllOrders() async {
@@ -40,9 +97,98 @@ class VendorOrderController extends GetxController {
       await _loadDeliveringLikeStatuses();
       await _loadStatus('Delivered', deliveredOrders, trackDelivered: true);
       await _loadStatus('Cancelled', cancelledOrders);
+      await fetchPendingDeliveryProofs();
     } finally {
       isLoading.value = false;
     }
+  }
+
+  Future<void> fetchPendingDeliveryProofs() async {
+    final accessToken = box.read('accessToken');
+    if (storeId.isEmpty || accessToken == null) {
+      pendingProofOrders.clear();
+      return;
+    }
+    pendingProofLoading.value = true;
+    try {
+      final url =
+          Uri.parse('$appBaseUrl/api/orders/store/$storeId/pending-delivery');
+      final response = await http.get(url, headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $accessToken',
+      });
+
+      if (response.statusCode == 200) {
+        final Map<String, dynamic> wrapper = jsonDecode(response.body);
+        final List<dynamic> data =
+            wrapper['data'] is List ? wrapper['data'] as List : const [];
+        pendingProofOrders.assignAll(data
+            .map(
+                (json) => OrdersModel.fromJson(Map<String, dynamic>.from(json)))
+            .toList());
+        _handlePendingProofSnapshot(pendingProofOrders);
+      } else {
+        pendingProofOrders.clear();
+        print(
+            '[VendorOrderController][fetchPendingDeliveryProofs] HTTP ${response.statusCode} body=${response.body}');
+      }
+    } catch (e) {
+      print('[VendorOrderController][fetchPendingDeliveryProofs] error=$e');
+    } finally {
+      pendingProofLoading.value = false;
+    }
+  }
+
+  Future<bool> reviewDeliveryProof(String orderId,
+      {required bool approve, String note = ''}) async {
+    final accessToken = box.read('accessToken');
+    if (accessToken == null) return false;
+    reviewingOrderId.value = orderId;
+    try {
+      final url =
+          Uri.parse('$appBaseUrl/api/orders/$orderId/shop-delivery-confirm');
+      final body = <String, dynamic>{
+        'action': approve ? 'confirm' : 'reject',
+      };
+      if (note.isNotEmpty) body['note'] = note;
+      final resp = await http.post(
+        url,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $accessToken',
+        },
+        body: jsonEncode(body),
+      );
+      Map<String, dynamic> data = {};
+      try {
+        data = Map<String, dynamic>.from(jsonDecode(resp.body));
+      } catch (_) {}
+
+      if (resp.statusCode == 200 && (data['status'] == true)) {
+        Get.snackbar(
+          'Thành công',
+          approve
+              ? 'Đã xác nhận khách đã nhận hàng'
+              : 'Đã từ chối bằng chứng giao',
+          backgroundColor: kPrimary,
+          colorText: kLightWhite,
+        );
+        await fetchPendingDeliveryProofs();
+        await fetchAllOrders();
+        return true;
+      } else {
+        final message =
+            (data['message'] ?? 'Không thể xử lý yêu cầu').toString();
+        Get.snackbar('Lỗi', message,
+            backgroundColor: kRed, colorText: kLightWhite);
+      }
+    } catch (e) {
+      Get.snackbar('Lỗi', 'Kết nối thất bại: $e',
+          backgroundColor: kRed, colorText: kLightWhite);
+    } finally {
+      reviewingOrderId.value = '';
+    }
+    return false;
   }
 
   Future<void> _loadStatus(String status, RxList<OrdersModel> target,
@@ -94,6 +240,19 @@ class VendorOrderController extends GetxController {
     _deliveredSnapshot = ids;
   }
 
+  void _handlePendingProofSnapshot(List<OrdersModel> orders) {
+    final ids = orders.map((e) => e.id).where((id) => id.isNotEmpty).toSet();
+    if (_pendingProofInitialized) {
+      final newlyPending = ids.difference(_pendingProofSnapshot);
+      if (newlyPending.isNotEmpty) {
+        _notifyPendingProofOrders(orders, newlyPending);
+      }
+    } else {
+      _pendingProofInitialized = true;
+    }
+    _pendingProofSnapshot = ids;
+  }
+
   void _notifyDeliveredOrders(
       List<OrdersModel> delivered, Set<String> newlyDelivered) {
     final recent = delivered
@@ -114,6 +273,31 @@ class VendorOrderController extends GetxController {
       'Shipper đã giao thành công',
       message,
       backgroundColor: Colors.green.shade600,
+      colorText: kLightWhite,
+      duration: const Duration(seconds: 4),
+    );
+  }
+
+  void _notifyPendingProofOrders(
+      List<OrdersModel> pending, Set<String> newlyPending) {
+    final recent = pending
+        .where((order) => newlyPending.contains(order.id))
+        .take(3)
+        .map((order) {
+      final shortId = order.id.length > 6
+          ? order.id.substring(order.id.length - 6).toUpperCase()
+          : order.id.toUpperCase();
+      return '#$shortId';
+    }).toList();
+    if (recent.isEmpty) return;
+    final moreCount = newlyPending.length - recent.length;
+    final message = moreCount > 0
+        ? '${recent.join(', ')} và $moreCount đơn khác đã có ảnh bàn giao.'
+        : '${recent.join(', ')} đã gửi ảnh bàn giao.';
+    Get.snackbar(
+      'Shipper đã gửi ảnh',
+      message,
+      backgroundColor: Colors.orange.shade600,
       colorText: kLightWhite,
       duration: const Duration(seconds: 4),
     );
@@ -148,6 +332,27 @@ class VendorOrderController extends GetxController {
       print('Error fetching $status orders: $e');
     }
     return <OrdersModel>[];
+  }
+
+  List<OrdersModel> allOrdersSnapshot() {
+    final Map<String, OrdersModel> combined = {};
+    void addList(List<OrdersModel> list) {
+      for (final order in list) {
+        if (order.id.isEmpty) continue;
+        combined[order.id] = order;
+      }
+    }
+
+    addList(pendingOrders);
+    addList(preparingOrders);
+    addList(waitingShipperOrders);
+    addList(readyForPickupOrders);
+    addList(deliveringOrders);
+    addList(deliveredOrders);
+    addList(cancelledOrders);
+    addList(pendingProofOrders);
+
+    return combined.values.toList(growable: false);
   }
 
   Future<Map<String, dynamic>?> markReadyForPickup(String orderId) async {

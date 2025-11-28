@@ -7,9 +7,12 @@ import 'package:appliances_flutter/views/add_appliances/add_appliances.dart';
 import 'package:appliances_flutter/views/appliances/appliances_list.dart';
 import 'package:appliances_flutter/views/wallet/wallet_page.dart';
 import 'package:appliances_flutter/views/orders/orders_page.dart';
+import 'package:appliances_flutter/views/orders/delivery_issue_dashboard_page.dart';
 import 'package:appliances_flutter/views/orders/return_center_page.dart';
+import 'package:appliances_flutter/views/orders/vendor_rating_center_page.dart';
 import 'package:appliances_flutter/views/profile/vendor_profile_page.dart';
 import 'package:appliances_flutter/views/support/service_center_page.dart';
+import 'package:appliances_flutter/views/insights/insights_page.dart';
 
 class HomeTiles extends StatelessWidget {
   const HomeTiles({
@@ -43,6 +46,30 @@ class HomeTiles extends StatelessWidget {
           },
           text: "Đơn hàng",
           icon: Icons.local_shipping),
+      HomeTile(
+          onTap: () {
+            Get.to(() => const VendorRatingCenterPage(),
+                transition: Transition.fadeIn,
+                duration: const Duration(milliseconds: 600));
+          },
+          text: "Đánh giá",
+          icon: Icons.reviews_outlined),
+      HomeTile(
+          onTap: () {
+            Get.to(() => const InsightsPage(),
+                transition: Transition.fadeIn,
+                duration: const Duration(milliseconds: 600));
+          },
+          text: "Phân tích",
+          icon: Icons.insights),
+      HomeTile(
+          onTap: () {
+            Get.to(() => const DeliveryIssueDashboardPage(),
+                transition: Transition.fadeIn,
+                duration: const Duration(milliseconds: 600));
+          },
+          text: "Vấn đề giao hàng",
+          icon: Icons.report_problem),
       HomeTile(
           onTap: () {
             Get.to(() => const ReturnCenterPage(),

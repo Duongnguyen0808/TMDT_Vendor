@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:get/get.dart';
+import 'package:printing/printing.dart';
 import 'package:appliances_flutter/common/app_style.dart';
 import 'package:appliances_flutter/common/background_container.dart';
 import 'package:appliances_flutter/common/reusable_text.dart';
@@ -8,6 +9,8 @@ import 'package:appliances_flutter/constants/constants.dart';
 import 'package:appliances_flutter/controllers/vendor_order_controller.dart';
 import 'package:appliances_flutter/views/orders/widgets/vendor_order_tile.dart';
 import 'package:appliances_flutter/controllers/chat_controller.dart';
+import 'package:appliances_flutter/models/orders_model.dart';
+import 'package:appliances_flutter/utils/invoice_pdf.dart';
 
 class OrdersPage extends StatefulWidget {
   const OrdersPage({super.key});
@@ -19,13 +22,17 @@ class OrdersPage extends StatefulWidget {
 class _OrdersPageState extends State<OrdersPage>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
+  late final VoidCallback _tabListener;
   final controller = Get.put(VendorOrderController());
   final chatCtrl = Get.put(VendorChatController());
+  bool _bulkPrinting = false;
 
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 6, vsync: this);
+    _tabListener = () => setState(() {});
+    _tabController.addListener(_tabListener);
     // load unread summary for order tiles badges
     WidgetsBinding.instance.addPostFrameCallback((_) {
       chatCtrl.loadUnreadSummary();
@@ -34,6 +41,7 @@ class _OrdersPageState extends State<OrdersPage>
 
   @override
   void dispose() {
+    _tabController.removeListener(_tabListener);
     _tabController.dispose();
     super.dispose();
   }
@@ -97,6 +105,8 @@ class _OrdersPageState extends State<OrdersPage>
           ],
         ),
       ),
+      floatingActionButton: _buildBulkPrintFab(),
+      floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
     );
   }
 
@@ -126,8 +136,9 @@ class _OrdersPageState extends State<OrdersPage>
     });
   }
 
-  Widget _buildOrdersList(RxList orders, String status) {
+  Widget _buildOrdersList(RxList<OrdersModel> orders, String status) {
     return Obx(() {
+      final isPreparingList = status == "Đang chuẩn bị";
       if (orders.isEmpty) {
         return Center(
           child: Column(
@@ -156,7 +167,8 @@ class _OrdersPageState extends State<OrdersPage>
       return RefreshIndicator(
         onRefresh: () => controller.fetchAllOrders(),
         child: ListView.builder(
-          padding: EdgeInsets.symmetric(vertical: 12.h),
+          padding:
+              EdgeInsets.fromLTRB(0, 12.h, 0, isPreparingList ? 112.h : 12.h),
           itemCount: orders.length,
           itemBuilder: (context, index) {
             return VendorOrderTile(
@@ -167,5 +179,60 @@ class _OrdersPageState extends State<OrdersPage>
         ),
       );
     });
+  }
+
+  Widget _buildBulkPrintFab() {
+    return Obx(() {
+      final orderCount = controller.preparingOrders.length;
+      final showButton = _tabController.index == 1 && orderCount > 0;
+      if (!showButton) {
+        return const SizedBox.shrink();
+      }
+      final orders = controller.preparingOrders.toList(growable: false);
+      final label = _bulkPrinting ? 'Đang in...' : 'In hóa đơn ($orderCount)';
+      return FloatingActionButton.extended(
+        heroTag: 'vendor_bulk_print_preparing',
+        backgroundColor: kPrimary,
+        onPressed: _bulkPrinting
+            ? null
+            : () => _handleBulkPrint(List<OrdersModel>.from(orders)),
+        icon: _bulkPrinting
+            ? SizedBox(
+                width: 18.w,
+                height: 18.w,
+                child: const CircularProgressIndicator(
+                    strokeWidth: 2, color: Colors.white),
+              )
+            : const Icon(Icons.print_outlined, color: Colors.white),
+        label: Text(label),
+      );
+    });
+  }
+
+  Future<void> _handleBulkPrint(List<OrdersModel> orders) async {
+    if (orders.isEmpty || _bulkPrinting) return;
+    setState(() => _bulkPrinting = true);
+    try {
+      final bytes = await buildInvoicePdf(orders);
+      await Printing.layoutPdf(onLayout: (_) async => bytes);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Đã gửi ${orders.length} phiếu hóa đơn đến máy in'),
+        ),
+      );
+    } catch (err) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Không thể in hàng loạt: $err')),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _bulkPrinting = false);
+      } else {
+        _bulkPrinting = false;
+      }
+    }
   }
 }
