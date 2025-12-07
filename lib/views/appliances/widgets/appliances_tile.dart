@@ -163,7 +163,8 @@ class _AppliancesTileState extends State<AppliancesTile> {
         child: Padding(
           padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 6.h),
           child: Container(
-            height: 100.h,
+            // Allow the tile to grow if content needs more space to avoid flex overflow
+            constraints: BoxConstraints(minHeight: 110.h),
             decoration: BoxDecoration(
               color: isAvailable ? kOffWhite : kGrayLight.withOpacity(0.5),
               borderRadius: BorderRadius.circular(16.r),
@@ -244,7 +245,7 @@ class _AppliancesTileState extends State<AppliancesTile> {
                         padding: EdgeInsets.symmetric(vertical: 10.h),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
-                          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                          mainAxisAlignment: MainAxisAlignment.start,
                           children: [
                             ReusableText(
                               text: widget.appliances.title,
@@ -254,6 +255,7 @@ class _AppliancesTileState extends State<AppliancesTile> {
                                 FontWeight.w600,
                               ),
                             ),
+                            SizedBox(height: 4.h),
                             Row(
                               children: [
                                 Icon(Icons.access_time,
@@ -265,6 +267,7 @@ class _AppliancesTileState extends State<AppliancesTile> {
                                 ),
                               ],
                             ),
+                            SizedBox(height: 4.h),
                             Row(
                               children: [
                                 Icon(Icons.inventory_2,
@@ -285,6 +288,7 @@ class _AppliancesTileState extends State<AppliancesTile> {
                                 ),
                               ],
                             ),
+                            SizedBox(height: 4.h),
                             _ProductRatingSnippet(
                               rating: widget.appliances.rating,
                               ratingCount: widget.appliances.ratingCount,

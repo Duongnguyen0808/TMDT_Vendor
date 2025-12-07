@@ -154,7 +154,8 @@ class VendorRatingService {
       'rating': rating,
       'comment': comment,
     });
-    final url = Uri.parse('$appBaseUrl/api/ratings');
+    // Backend path uses /api/rating (singular)
+    final url = Uri.parse('$appBaseUrl/api/rating');
     final resp =
         await http.post(url, headers: _headers(withJson: true), body: payload);
     final Map<String, dynamic> body = _decode(resp.body);

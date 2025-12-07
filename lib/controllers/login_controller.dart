@@ -6,6 +6,7 @@ import 'package:appliances_flutter/main.dart';
 import 'package:appliances_flutter/models/api_error.dart';
 import 'package:appliances_flutter/models/login_response.dart';
 import 'package:appliances_flutter/models/store_response.dart';
+import 'package:appliances_flutter/services/push_notification_service.dart';
 import 'package:appliances_flutter/views/auth/login_page.dart';
 import 'package:appliances_flutter/views/auth/store_registaration.dart';
 import 'package:appliances_flutter/views/auth/verification_page.dart';
@@ -53,6 +54,7 @@ class LoginController extends GetxController {
         box.write('userId', data.id);
         box.write('accessToken', data.userToken);
         box.write('e-verification', data.verification);
+        await PushNotificationService.syncTokenWithBackend();
 
         final isEmailVerified = data.verification;
         final isVendor = data.userType.toLowerCase() == 'vendor';

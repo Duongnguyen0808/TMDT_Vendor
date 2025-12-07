@@ -418,9 +418,15 @@ class _OrderDetailPageState extends State<OrderDetailPage> {
                 children: [
                   const Icon(Icons.photo_camera_back_outlined, color: kPrimary),
                   const SizedBox(width: 8),
-                  Text('Bằng chứng giao hàng',
-                      style: appStyle(15, kDark, FontWeight.w700)),
-                  const Spacer(),
+                  Expanded(
+                    child: Text(
+                      'Bằng chứng giao hàng',
+                      style: appStyle(15, kDark, FontWeight.w700),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
                   Container(
                     padding:
                         const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
