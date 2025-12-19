@@ -23,20 +23,32 @@ FetchOrders fetchOrders(String status) {
     };
 
     try {
-      final url = Uri.parse('$appBaseUrl/api/orders/rest-orders/$id/$status');
+      // BE route: /api/orders/store/:id/:status?all=1 để thấy cả Pending
+      final url = Uri.parse('$appBaseUrl/api/orders/store/$id/$status?all=1');
       final response = await http.get(url, headers: headers);
 
       if (response.statusCode == 200) {
+        // Response mới dạng { status, count, data: [...] }
         applianceslist.value = ordersModelFromJson(response.body);
+        // Debug
+        // ignore: avoid_print
+        print(
+            '[orders_hook] Loaded ${applianceslist.value?.length ?? 0} orders for status=$status');
         isLoading.value = false;
         isError.value = null;
       } else {
         isLoading.value = false;
+        // ignore: avoid_print
+        print(
+            '[orders_hook][ERROR] code=${response.statusCode} body=${response.body.substring(0, response.body.length > 300 ? 300 : response.body.length)}');
         isError.value = apiErrorFromJson(response.body);
       }
     } catch (e) {
       isLoading.value = false;
+      // e.toString() có thể không phải JSON, apiErrorFromJson đã được harden
       isError.value = apiErrorFromJson(e.toString());
+      // ignore: avoid_print
+      print('[orders_hook][EXCEPTION] ${e.toString()}');
     } finally {
       isLoading.value = false;
     }

@@ -36,7 +36,7 @@ double width = 428.w;
 
 // final String appBaseUrl =
 //     Platform.isAndroid ? "http://10.0.2.2:6013" : "http://localhost:6013";
-final String appBaseUrl = "http://10.0.2.2:6013";
+final String appBaseUrl = "http://192.168.1.7:6013";
 
 List<String> orderList = [
   "Đơn mới",
@@ -53,3 +53,15 @@ Duration? kDuration = const Duration(milliseconds: 900);
 
 const String cloudinaryCloudName = 'dibkwyg6e';
 const String cloudinaryUploadPreset = 'unsigned';
+
+// Format number to Vietnamese thousand grouping with dots (e.g. 1234567 -> 1.234.567)
+String formatVND(num value) {
+  final intVal = value.round();
+  final sign = intVal < 0 ? '-' : '';
+  final digits = intVal.abs().toString();
+  final formatted = digits.replaceAllMapped(
+    RegExp(r'(\d)(?=(\d{3})+(?!\d))'),
+    (m) => '${m[1]}.',
+  );
+  return sign + formatted;
+}

@@ -49,26 +49,32 @@ class StoreResponse {
   });
 
   factory StoreResponse.fromJson(Map<String, dynamic> json) => StoreResponse(
-        id: json["_id"] ?? "",
-        title: json["title"] ?? "",
-        time: json["time"] ?? "",
-        imageUrl: json["imageUrl"] ?? "",
-        owner: json["owner"] ?? "",
-        code: json["code"] ?? "",
-        isAvailable: json["isAvailable"] ?? true,
-        pickup: json["pickup"] ?? true,
-        delivery: json["delivery"] ?? true,
+        id: (json["_id"] ?? "").toString(),
+        title: (json["title"] ?? "").toString(),
+        time: (json["time"] ?? "").toString(),
+        imageUrl: (json["imageUrl"] ?? "").toString(),
+        owner: (json["owner"] ?? "").toString(),
+        code: (json["code"] ?? "").toString(),
+        isAvailable: json["isAvailable"] is bool ? json["isAvailable"] : true,
+        pickup: json["pickup"] is bool ? json["pickup"] : true,
+        delivery: json["delivery"] is bool ? json["delivery"] : true,
         appliances: json["appliances"] != null
-            ? List<dynamic>.from(json["appliances"].map((x) => x))
+            ? List<dynamic>.from((json["appliances"] as List).map((x) => x))
             : [],
-        logoUrl: json["logoUrl"] ?? "",
-        rating: json["rating"] ?? 3,
-        ratingCount: json["ratingCount"] ?? "0",
-        verification: json["verification"] ?? "Đang chờ duyệt",
-        verificationMessage:
-            json["verificationMessage"] ?? "Cửa hàng của bạn đang được xem xét",
-        coords: Coords.fromJson(json["coords"]),
-        earnings: json["earnings"]?.toDouble() ?? 0.0,
+        logoUrl: (json["logoUrl"] ?? "").toString(),
+        rating: (json["rating"] is int)
+            ? json["rating"]
+            : (json["rating"] is num ? (json["rating"] as num).round() : 3),
+        // Trường ratingCount đôi khi backend gửi int -> ép chuỗi
+        ratingCount: (json["ratingCount"] ?? "0").toString(),
+        verification: (json["verification"] ?? "Đang chờ duyệt").toString(),
+        verificationMessage: (json["verificationMessage"] ??
+                "Cửa hàng của bạn đang được xem xét")
+            .toString(),
+        coords: json["coords"] is Map
+            ? Coords.fromJson(json["coords"])
+            : Coords.empty(),
+        earnings: _toDouble(json["earnings"]),
       );
 
   Map<String, dynamic> toJson() => {
@@ -108,11 +114,19 @@ class Coords {
   });
 
   factory Coords.fromJson(Map<String, dynamic> json) => Coords(
-        id: json["id"],
-        latitude: json["latitude"]?.toDouble(),
-        longitude: json["longitude"]?.toDouble(),
-        address: json["address"],
-        title: json["title"],
+        id: (json["id"] ?? "").toString(),
+        latitude: _toDouble(json["latitude"]),
+        longitude: _toDouble(json["longitude"]),
+        address: (json["address"] ?? "").toString(),
+        title: (json["title"] ?? "").toString(),
+      );
+
+  factory Coords.empty() => Coords(
+        id: "",
+        latitude: 0,
+        longitude: 0,
+        address: "",
+        title: "",
       );
 
   Map<String, dynamic> toJson() => {
@@ -122,4 +136,15 @@ class Coords {
         "address": address,
         "title": title,
       };
+}
+
+double _toDouble(dynamic v) {
+  if (v == null) return 0.0;
+  if (v is double) return v;
+  if (v is int) return v.toDouble();
+  if (v is num) return v.toDouble();
+  if (v is String) {
+    return double.tryParse(v) ?? 0.0;
+  }
+  return 0.0;
 }

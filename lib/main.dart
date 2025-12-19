@@ -1,9 +1,12 @@
 import 'package:appliances_flutter/firebase_options.dart';
+import 'package:appliances_flutter/services/push_notification_service.dart';
+import 'package:appliances_flutter/controllers/live_updates_controller.dart';
 import 'package:appliances_flutter/views/auth/login_page.dart';
 import 'package:appliances_flutter/views/auth/verification_page.dart';
 import 'package:appliances_flutter/views/auth/waiting_page.dart';
 import 'package:appliances_flutter/views/home/home_page.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:get/get.dart';
@@ -16,8 +19,12 @@ Widget defaultHome = const Login();
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+  FirebaseMessaging.onBackgroundMessage(
+    vendorFirebaseMessagingBackgroundHandler,
+  );
 
   await GetStorage.init();
+  await PushNotificationService.init();
   const envKey = String.fromEnvironment('VIETMAP_API_KEY', defaultValue: '');
   final key = envKey.isNotEmpty ? envKey : vietmapApiKey;
   if (key.isNotEmpty) {
@@ -47,6 +54,13 @@ class MyApp extends StatelessWidget {
       defaultHome = const HomePage();
     } else if (storeId != null && verification != null) {
       defaultHome = const WaitingPage();
+    }
+
+    // Initialize socket live updates when logged in
+    if (accessToken != null) {
+      if (!Get.isRegistered<LiveUpdatesController>()) {
+        Get.put(LiveUpdatesController(), permanent: true);
+      }
     }
 
     return ScreenUtilInit(

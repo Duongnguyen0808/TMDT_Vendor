@@ -7,6 +7,10 @@ import 'package:appliances_flutter/common/reusable_text.dart';
 import 'package:appliances_flutter/constants/constants.dart';
 import 'package:appliances_flutter/models/orders_model.dart';
 import 'package:appliances_flutter/views/orders/widgets/order_detail_page.dart';
+import 'package:appliances_flutter/controllers/chat_controller.dart';
+import 'package:appliances_flutter/views/chat/chat_detail_page.dart';
+// phone call helper
+import 'package:url_launcher/url_launcher.dart' as ul;
 
 class VendorOrderTile extends StatelessWidget {
   final OrdersModel order;
@@ -18,12 +22,18 @@ class VendorOrderTile extends StatelessWidget {
     this.onStatusChanged,
   });
 
-  String _getStatusText(String status) {
-    switch (status) {
+  String _statusText() {
+    switch (order.orderStatus) {
       case 'Pending':
         return 'Đơn hàng mới';
       case 'Preparing':
         return 'Đang chuẩn bị';
+      case 'WaitingShipper':
+        return (order.driverId == null || order.driverId!.isEmpty)
+            ? 'Tìm shipper'
+            : 'Shipper đã nhận';
+      case 'PickedUp':
+        return 'Đang lấy hàng';
       case 'Delivering':
         return 'Đang giao hàng';
       case 'Delivered':
@@ -31,16 +41,24 @@ class VendorOrderTile extends StatelessWidget {
       case 'Cancelled':
         return 'Đã hủy';
       default:
-        return status;
+        return order.orderStatus;
     }
   }
 
-  Color _getStatusColor(String status) {
-    switch (status) {
+  Color _statusColor() {
+    switch (order.orderStatus) {
       case 'Pending':
         return Colors.orange;
       case 'Preparing':
         return Colors.blue;
+      case 'WaitingShipper':
+        return (order.driverId == null || order.driverId!.isEmpty)
+            ? Colors.purple
+            : Colors.teal;
+      case 'PickedUp':
+        return Colors.blueGrey;
+      case 'Delivering':
+        return Colors.green;
       case 'Delivered':
         return Colors.green;
       case 'Cancelled':
@@ -94,18 +112,18 @@ class VendorOrderTile extends StatelessWidget {
                   padding:
                       EdgeInsets.symmetric(horizontal: 12.w, vertical: 4.h),
                   decoration: BoxDecoration(
-                    color: _getStatusColor(order.orderStatus).withOpacity(0.1),
+                    color: _statusColor().withOpacity(0.1),
                     borderRadius: BorderRadius.circular(12.r),
                     border: Border.all(
-                      color: _getStatusColor(order.orderStatus),
+                      color: _statusColor(),
                       width: 1,
                     ),
                   ),
                   child: ReusableText(
-                    text: _getStatusText(order.orderStatus),
+                    text: _statusText(),
                     style: appStyle(
                       11,
-                      _getStatusColor(order.orderStatus),
+                      _statusColor(),
                       FontWeight.w600,
                     ),
                   ),
@@ -140,6 +158,23 @@ class VendorOrderTile extends StatelessWidget {
                     style: appStyle(12, kDark, FontWeight.w500),
                   ),
                 ),
+                Obx(() {
+                  final chatCtrl = Get.find<VendorChatController>();
+                  final unread = chatCtrl.unreadByUser[order.userId.id] ?? 0;
+                  if (unread <= 0) return const SizedBox.shrink();
+                  return Container(
+                    padding:
+                        EdgeInsets.symmetric(horizontal: 6.w, vertical: 2.h),
+                    decoration: BoxDecoration(
+                      color: Colors.redAccent,
+                      borderRadius: BorderRadius.circular(10.r),
+                    ),
+                    child: Text(
+                      unread > 99 ? '99+' : unread.toString(),
+                      style: appStyle(10, kLightWhite, FontWeight.bold),
+                    ),
+                  );
+                }),
               ],
             ),
 
@@ -157,7 +192,7 @@ class VendorOrderTile extends StatelessWidget {
                   ),
                 ),
                 ReusableText(
-                  text: "${order.grandTotal.toStringAsFixed(0)}đ",
+                  text: "${formatVND(order.grandTotal)}đ",
                   style: appStyle(14, kPrimary, FontWeight.bold),
                 ),
               ],
@@ -174,6 +209,65 @@ class VendorOrderTile extends StatelessWidget {
                   child: ReusableText(
                     text: order.deliveryAddress.addressLine1,
                     style: appStyle(11, kGray, FontWeight.normal),
+                  ),
+                ),
+              ],
+            ),
+
+            // Quick actions: Call + Chat
+            SizedBox(height: 10.h),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                IconButton(
+                  tooltip: 'Gọi khách',
+                  onPressed: () async {
+                    final phone = order.userId.phone;
+                    if (phone.isEmpty) {
+                      Get.snackbar('Thông báo', 'Không có số điện thoại');
+                      return;
+                    }
+                    final uri = Uri(scheme: 'tel', path: phone);
+                    try {
+                      if (await ul.canLaunchUrl(uri)) {
+                        await ul.launchUrl(uri);
+                      } else {
+                        Get.snackbar('Lỗi', 'Không thể mở trình gọi');
+                      }
+                    } catch (_) {
+                      Get.snackbar('Lỗi', 'Không thể thực hiện cuộc gọi');
+                    }
+                  },
+                  icon: const Icon(Icons.call, color: Colors.green),
+                ),
+                TextButton.icon(
+                  style: TextButton.styleFrom(
+                    foregroundColor: kPrimary,
+                    padding:
+                        EdgeInsets.symmetric(horizontal: 8.w, vertical: 4.h),
+                  ),
+                  onPressed: () async {
+                    final chatCtrl = Get.isRegistered<VendorChatController>()
+                        ? Get.find<VendorChatController>()
+                        : Get.put(VendorChatController());
+                    final conv =
+                        await chatCtrl.getOrCreateWithUser(order.userId.id);
+                    if (conv != null) {
+                      final title = order.userId.phone.isNotEmpty
+                          ? order.userId.phone
+                          : 'Khách hàng';
+                      Get.to(() => VendorChatDetailPage(
+                            conversationId: conv['id'].toString(),
+                            title: title,
+                          ));
+                    } else {
+                      Get.snackbar('Lỗi', 'Không thể mở hội thoại');
+                    }
+                  },
+                  icon: const Icon(Icons.chat_bubble_outline, size: 18),
+                  label: ReusableText(
+                    text: 'Chat với khách',
+                    style: appStyle(12, kPrimary, FontWeight.w600),
                   ),
                 ),
               ],

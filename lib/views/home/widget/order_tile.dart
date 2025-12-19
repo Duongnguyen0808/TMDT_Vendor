@@ -99,7 +99,7 @@ class OrderTile extends StatelessWidget {
                                 color: const Color(0xFFFFFFFF),
                                 borderRadius: BorderRadius.circular(10)),
                             child: ReusableText(
-                                text: "\$ ${order.deliveryFee}",
+                                text: "Phí: ${formatVND(order.deliveryFee)}đ",
                                 style: appStyle(9, kGray, FontWeight.w400)),
                           ),
                           Container(
@@ -128,8 +128,8 @@ class OrderTile extends StatelessWidget {
                 child: SizedBox(
                   width: 19.h,
                   height: 19.h,
-                  child: Image.network(order.storeId.logoUrl,
-                      fit: BoxFit.cover),
+                  child:
+                      Image.network(order.storeId.logoUrl, fit: BoxFit.cover),
                 ),
               ))
         ],
